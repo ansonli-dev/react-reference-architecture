@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -52,6 +52,14 @@ try {
     BOOKSTORE_BUILD_PROFILE: profile === 'release' ? 'demo' : 'release',
     DEMO_DATA_DIR: join(work, 'data'),
   });
+  if (profile === 'demo') {
+    const seed = spawnSync(
+      process.execPath,
+      [join(root, 'scripts', 'demo-seed.mjs')],
+      { cwd: root, env, stdio: 'inherit' },
+    );
+    if (seed.status !== 0) throw new Error('Teaching catalog seed failed');
+  }
   const runner = fileURLToPath(
     new URL('../../scripts/run-app.mjs', import.meta.url),
   );

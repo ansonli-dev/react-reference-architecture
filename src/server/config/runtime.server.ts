@@ -1,6 +1,6 @@
 import 'server-only';
-import { isAbsolute, normalize, parse } from 'node:path';
 import { z } from 'zod';
+import { demoDataDir } from '@/server/adapters/demo/data-path';
 
 const origin = z
   .string()
@@ -9,17 +9,6 @@ const origin = z
   .transform((value) => new URL(value).origin);
 
 const appOrigin = origin.default('http://127.0.0.1:3000');
-
-export const demoDataDir = z
-  .string()
-  .refine(
-    (value) =>
-      isAbsolute(value) &&
-      normalize(value) !== parse(value).root &&
-      !/[\u0000-\u001f\u007f]/u.test(value) &&
-      !value.split(/[/\\]/).includes('..'),
-  )
-  .transform((value) => normalize(value));
 
 const demoEnv = z.object({
   APP_ORIGIN: appOrigin.refine((value) =>
