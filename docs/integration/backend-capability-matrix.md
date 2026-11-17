@@ -1,6 +1,6 @@
 # Java 后端能力矩阵
 
-核对日期为 2026-11-17。源码基线为 [explicit-architecture@14e511a](https://github.com/ansonli-dev/explicit-architecture/tree/14e511a8f361616e166f23daf5184012d501c656)。本页是源码勘察记录，当前阶段尚未启动 Java 环境，也未取得 HTTP 集成验收证据。
+核对日期为 2026-11-17。下表记录 [explicit-architecture@14e511a](https://github.com/ansonli-dev/explicit-architecture/tree/14e511a8f361616e166f23daf5184012d501c656) 的源码勘察，实测证据见下方目录验收。
 
 | 能力                 | 源码确认的传输契约                                                                                                                    | 前端决策与待验证条件                                                                                                                                                                        |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -29,14 +29,12 @@
 
 在固定 SHA `14e511a8f361616e166f23daf5184012d501c656` 上复核控制器、两个响应 record 与 JPA 查询。列表和详情都有相同的 7 个字段。两个 record 的 `priceCents` 为 Java `long`，`stock` 为 `int`。列表从第 0 页开始，`category` 使用精确匹配，查询没有排序子句。前端 v1 兼容范围为公开只读列表与详情，分类可选值由前端部署配置提供。
 
-证据状态为源码确认，真实 Java HTTP 待验。
-
 - [BookSummaryResponse](https://github.com/ansonli-dev/explicit-architecture/blob/14e511a8f361616e166f23daf5184012d501c656/catalog/src/main/java/com/example/catalog/interfaces/rest/response/BookSummaryResponse.java)
 - [BookDetailResponse](https://github.com/ansonli-dev/explicit-architecture/blob/14e511a8f361616e166f23daf5184012d501c656/catalog/src/main/java/com/example/catalog/interfaces/rest/response/BookDetailResponse.java)
 
 ## B4 目录验收
 
 - 教学 SQLite 已通过种子、查询、HTTP 及生产浏览器验收。
-- Java v1 本机 HTTP stub 已通过列表与详情映射、0-based 分页、无效上游 JSON、不安全的 `long`、超时和未知 UUID。真实 HTTP 证据待后端环境可用后补录。
+- Java v1 本机 HTTP stub 已通过列表与详情映射、0-based 分页、无效上游 JSON、不安全的 `long`、超时和未知 UUID。
 - Release 生产产物在 runtime 注入教学 profile 和有效的教学库后，仍视未配置 Java 为目录不可用。健康检查维持 200，就绪返回 503。配置有效时使用 Java 适配器。
-- [目录 walkthrough](../walkthroughs/01-catalog.md) 提供真实 OpenAPI 与受控 seed 的核验入口。J7–J8 等 Java v2 契约交付后执行。
+- [真实目录 E2E](../walkthroughs/01-catalog.md#java-v1-真实目录-e2e) 已在前端 `0534212` 与 Java `de7ab0c` 上通过，覆盖真实分类、分页、详情映射和缺书 404。Java v2 契约及后端验证见 [后端 PR #2](https://github.com/ansonli-dev/explicit-architecture/pull/2)。

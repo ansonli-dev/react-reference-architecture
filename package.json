@@ -21,6 +21,7 @@
     "api:check": "node scripts/generate-api.mjs --check",
     "test": "vitest run",
     "test:e2e": "playwright test",
+    "test:e2e:java": "playwright test --config playwright.java.config.ts",
     "demo:seed": "node scripts/demo-seed.mjs"
   },
   "dependencies": {

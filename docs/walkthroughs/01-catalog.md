@@ -28,15 +28,28 @@ pnpm test:e2e catalog-http.spec.ts catalog-journey.spec.ts
 
 在 `demo` 生产产物上测试独立 SQLite 种子和目录请求。在 `release` 生产产物上连接可控制延迟和响应的本机 Java HTTP stub。目录用例读取原始 HTTP 响应证明书名由服务端输出，验证延迟上游时 shell 与加载提示先到、第 100 页满页时没有下一页，以及同一 Next 进程的上游计数。隔离实例另验证缺 Java 或 SQLite 时构建仍可启动、健康为 200、就绪为 503。
 
-## Java v1 真实 HTTP 核验入口
+## Java v1 真实目录 E2E
 
-后端源码基线为 `14e511a8f361616e166f23daf5184012d501c656`。按该提交的 [后端运行说明](https://github.com/ansonli-dev/explicit-architecture/blob/14e511a8f361616e166f23daf5184012d501c656/README-zh.md) 发布本地共享模块，配置 PostgreSQL、Redis 和 Kafka，再在 `catalog/` 运行 `./gradlew bootRun`。[目录配置](https://github.com/ansonli-dev/explicit-architecture/blob/14e511a8f361616e166f23daf5184012d501c656/catalog/src/main/resources/application.yml) 提供 8081 端口，以及数据库、Schema Registry、Flyway 和 OpenAPI 的配置入口。
+使用 [后端 main de7ab0c](https://github.com/ansonli-dev/explicit-architecture/tree/de7ab0c373afe1dd3206034bb2e6a2d94b212726) 的 Catalog，以 JDK 21 运行默认 profile。为验收准备独立的 PostgreSQL 和 Redis；按 [目录配置](https://github.com/ansonli-dev/explicit-architecture/blob/de7ab0c373afe1dd3206034bb2e6a2d94b212726/catalog/src/main/resources/application.yml) 设置 `SPRING_DATASOURCE_*` 和 `SPRING_DATA_REDIS_*`。在后端根目录执行：
 
 ```bash
-curl -fsS http://127.0.0.1:8081/v3/api-docs
-curl -fsS 'http://127.0.0.1:8081/api/v1/books?page=0&size=12'
+(cd seedwork && ./gradlew publishToMavenLocal)
+(cd shared-events && ./gradlew publishToMavenLocal)
+(cd catalog && ./gradlew bootJar)
+SPRING_PROFILES_ACTIVE=default OTEL_SDK_DISABLED=true java --enable-preview \
+  -jar catalog/build/libs/catalog-0.0.1-SNAPSHOT.jar \
+  --server.address=127.0.0.1 --server.port=8081 \
+  --spring.kafka.listener.auto-startup=false --outbox.relay.strategy=disabled
 ```
 
-用该环境的受控 seed 查到首尾页及已知 UUID，再分别请求详情和未知 UUID。将 OpenAPI 与 [适配快照](../../contracts/java/catalog-v1.yaml) 对照，记录 Java 和前端提交、数据来源、实际请求与脱敏结果。确认分类大小写与后端原值一致，并检查 Java v1 无排序或总量时的尾页行为。服务未启动、Flyway 或依赖配置出错时先检查 Java 健康和日志。超时和契约漂移在 BFF 分别表现为 504 和 502。
+Flyway 完成后，按 [后端种子说明](https://github.com/ansonli-dev/explicit-architecture/blob/de7ab0c373afe1dd3206034bb2e6a2d94b212726/demo/README.md#verification)，用 `psql "$LEGACY_CATALOG_DB_URL" -v ON_ERROR_STOP=1 -f demo/seed/catalog.sql` 向该库写入 13 本书。然后在前端仓根目录执行：
 
-本次证据覆盖教学 SQLite 和本机 HTTP stub。真实 Java HTTP 待验，J7–J8 依赖后续契约。
+```bash
+pnpm exec playwright install chromium --only-shell
+pnpm build
+JAVA_CATALOG_BASE_URL=http://127.0.0.1:8081 pnpm test:e2e:java
+```
+
+用例会在本机 3220 端口启动发布构建，检查 Java 的 OpenAPI、分页和详情，将实际 HTTP 响应与 BFF、服务端 HTML 和 Chromium 中的书籍页面对照。默认 `pnpm test:e2e` 继续使用 SQLite 与 HTTP stub。
+
+2026-11-17，前端 [main 0534212](https://github.com/ansonli-dev/react-reference-architecture/commit/053421270f758308f18506ccf8df7b73754a020c) 生产构建对接后端 `de7ab0c`，两条 Playwright 验收通过。Java 首尾页分别返回 12 和 1 本，`Architecture` 返回 6 本。详情显示 `Bounded Contexts`、作者 `Lin Zhao`、CNY 49.00 和库存 30。缺失 UUID 在 Java 与 BFF 都返回 404，浏览器显示缺书页。现场 OpenAPI 的列表和详情 schema 分列，七个响应字段与 [只读快照](../../contracts/java/catalog-v1.yaml) 一致。验证范围为 v1 只读目录。

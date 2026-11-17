@@ -19,7 +19,7 @@ pnpm dev:mock
 
 ## Java v1 只读模式
 
-`pnpm dev` 与 `pnpm dev:real` 启动发布配置的开发服务器。`pnpm build` 和 `pnpm start` 用于发布构建。要读取 Java v1，按 [环境变量示例](.env.example) 设置 `JAVA_CATALOG_BASE_URL` 与可选的原值分类数组。前端适配已通过本机 HTTP stub，真实 Java 的 HTTP 验收仍待联调。
+`pnpm dev` 与 `pnpm dev:real` 启动发布配置的开发服务器。`pnpm build` 和 `pnpm start` 用于发布构建。要读取 Java v1，按 [环境变量示例](.env.example) 设置 `JAVA_CATALOG_BASE_URL` 与可选的原值分类数组。[真实 Java 目录 E2E](docs/walkthroughs/01-catalog.md#java-v1-真实目录-e2e) 提供可复跑的验收命令。
 
 `GET /api/health` 检查进程是否存活。`GET /api/ready` 探测已配置的数据源，缺失或不可用时返回 503 和安全原因。两套构建均可在没有 Java、IdP 和 SQLite 的环境中生成。
 
@@ -45,4 +45,4 @@ Playwright 对现有生产产物启动隔离实例。只调试开发外壳时可
 - [Superpowers 设计与实施计划](docs/superpowers/README.md)
 - [建设指导书](docs/project-guide.md) 与 [工程基线 ADR](docs/adr/0001-application-baseline.md)
 
-购物车、结算、订单与管理属于后续切片。J7–J8 在 Java v2 契约交付后联调。
+购物车、结算、订单与管理属于后续切片。[Java v2 契约及后端验收](https://github.com/ansonli-dev/explicit-architecture/pull/2) 在 Java 仓库维护。
