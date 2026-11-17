@@ -7,8 +7,12 @@ export function apiErrorResponse(error: unknown) {
   const body: ApiError = {
     error: { code: failure.code, requestId: crypto.randomUUID() },
   };
-  return Response.json(body, {
-    status: failure.status,
+  return apiJson(body, failure.status);
+}
+
+export function apiJson(data: unknown, status = 200) {
+  return Response.json(data, {
+    status,
     headers: { 'Cache-Control': 'no-store' },
   });
 }

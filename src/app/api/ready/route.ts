@@ -1,21 +1,11 @@
 import { connection } from 'next/server';
-import { runtimeConfig } from '@/server/config/runtime.server';
+import { probeCatalog } from '@/server/catalog.server';
+import { apiJson } from '@/server/http/response.server';
 
 export async function GET() {
   await connection();
-  let reason = 'CATALOG_NOT_CONFIGURED';
-  try {
-    const config = runtimeConfig();
-    if (
-      config.profile === 'demo' ? config.dataDir : config.javaCatalogBaseUrl
-    ) {
-      reason = 'CATALOG_UNAVAILABLE';
-    }
-  } catch {
-    reason = 'CONFIG_INVALID';
-  }
-  return Response.json(
-    { status: 'unavailable', reason },
-    { status: 503, headers: { 'Cache-Control': 'no-store' } },
-  );
+  const reason = await probeCatalog();
+  return reason === null
+    ? apiJson({ status: 'ready' })
+    : apiJson({ status: 'unavailable', reason }, 503);
 }

@@ -9,3 +9,14 @@ export const routing = defineRouting({
 });
 
 export type Locale = (typeof routing.locales)[number];
+
+export function localeFromHeader(value: string | null): Locale {
+  for (const item of value?.split(',') ?? []) {
+    const requested = item.split(';')[0].trim().toLowerCase();
+    const locale = routing.locales.find(
+      (candidate) => candidate.toLowerCase() === requested,
+    );
+    if (locale) return locale;
+  }
+  return routing.defaultLocale;
+}

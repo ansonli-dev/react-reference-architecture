@@ -5,8 +5,9 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertBuiltProfile, profiles } from '../../scripts/build-profiles.mjs';
+import { javaStubOrigin, startJavaCatalogStub } from './java-catalog-stub.mjs';
 
-const [profile, port] = process.argv.slice(2);
+const [profile, port, mode] = process.argv.slice(2);
 if (
   !Object.hasOwn(profiles, profile) ||
   !/^\d{1,5}$/.test(port ?? '') ||
@@ -19,6 +20,8 @@ if (
 const root = resolve(process.cwd());
 assertBuiltProfile(root, profile);
 
+const withoutCatalog = mode === 'without-catalog';
+let stub;
 const work = mkdtempSync(join(tmpdir(), 'bookstore-' + profile + '-'));
 try {
   for (const dir of [
@@ -52,13 +55,25 @@ try {
     BOOKSTORE_BUILD_PROFILE: profile === 'release' ? 'demo' : 'release',
     DEMO_DATA_DIR: join(work, 'data'),
   });
-  if (profile === 'demo') {
+  // Give the unconfigured release a real SQLite file to exercise the profile guard.
+  const shouldSeed = profile === 'demo' ? !withoutCatalog : withoutCatalog;
+  if (shouldSeed) {
     const seed = spawnSync(
       process.execPath,
       [join(root, 'scripts', 'demo-seed.mjs')],
       { cwd: root, env, stdio: 'inherit' },
     );
     if (seed.status !== 0) throw new Error('Teaching catalog seed failed');
+  }
+  if (profile === 'release' && !withoutCatalog) {
+    stub = await startJavaCatalogStub();
+    env.JAVA_CATALOG_BASE_URL = javaStubOrigin;
+    env.JAVA_CATALOG_TOKEN = 'fixture-service';
+    env.CATALOG_CATEGORIES_JSON = JSON.stringify([
+      'Architecture',
+      'Programming',
+      'Full shelf',
+    ]);
   }
   const runner = fileURLToPath(
     new URL('../../scripts/run-app.mjs', import.meta.url),
@@ -74,5 +89,7 @@ try {
   const [code, signal] = await once(child, 'exit');
   process.exitCode = code ?? (signal === 'SIGTERM' ? 0 : 1);
 } finally {
+  stub?.closeAllConnections();
+  stub?.close();
   rmSync(work, { recursive: true, force: true });
 }
