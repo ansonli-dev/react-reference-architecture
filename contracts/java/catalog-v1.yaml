@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Java catalog v1 read-only subset
   version: 1.0.0
-  description: Source-derived subset pending live OpenAPI verification.
+  description: Read-only subset of the public Java v1 Catalog API.
 externalDocs:
   url: https://github.com/ansonli-dev/explicit-architecture/tree/14e511a8f361616e166f23daf5184012d501c656/catalog
 paths:
