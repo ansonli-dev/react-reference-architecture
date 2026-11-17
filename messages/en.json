@@ -32,5 +32,29 @@
       "title": "Business backend",
       "description": "Business rules, transactions, and authoritative data"
     }
+  },
+  "Catalog": {
+    "title": "Book catalog",
+    "category": "Category",
+    "allCategories": "All categories",
+    "search": "Search books",
+    "searchHint": "Title or author",
+    "apply": "Apply filters",
+    "reset": "Reset filters",
+    "retry": "Try again",
+    "loading": "Loading books",
+    "empty": "No books match these filters.",
+    "previous": "Previous page",
+    "next": "Next page",
+    "pagination": "Catalog pagination",
+    "page": "Page {page, number}",
+    "invalid": "Check your filters and try again.",
+    "unsupported": "Keyword search is unavailable for this catalog.",
+    "unavailable": "Books are temporarily unavailable.",
+    "notFound": "Book not found",
+    "back": "Back to books",
+    "stock": "{count, plural, one {# copy in stock} other {# copies in stock}}",
+    "soldOut": "Out of stock",
+    "price": "Price"
   }
 }
