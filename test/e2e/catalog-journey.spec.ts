@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import {
   firstBookId,
   missingBookId,
+  readJavaCalls,
   setJavaScenario,
 } from '../support/catalog-scenario';
 
@@ -141,4 +142,92 @@ test('offers a retry after a Java outage without serving demo data', async ({
   await page.getByRole('link', { name: 'Try again' }).click();
   await expect(page).toHaveURL('/en/books?page=99');
   await expect(page.getByText('No books match these filters.')).toBeVisible();
+});
+
+test('page 100 never offers a next link even when all twelve book slots are filled', async ({
+  page,
+  request,
+}, info) => {
+  test.skip(info.project.name !== 'release');
+  const filters = 'category=Full+shelf&page=100';
+  const response = await request.get('/api/v1/catalog/books?' + filters);
+  expect(response.status()).toBe(200);
+  const data = await response.json();
+  expect(data).toMatchObject({ page: 100, hasNext: false });
+  expect(data.books).toHaveLength(12);
+
+  await page.goto('/en/books?' + filters);
+  await expect(page.getByRole('article')).toHaveCount(12);
+  await expect(page.getByRole('link', { name: 'Next page' })).toHaveCount(0);
+  await expect(
+    page.getByRole('link', { name: 'Previous page' }),
+  ).toHaveAttribute('href', '/en/books?category=Full+shelf&page=99');
+});
+
+test('streams the static shell before the delayed upstream books', async ({
+  request,
+  baseURL,
+}, info) => {
+  test.skip(info.project.name !== 'release');
+  await setJavaScenario(request, { delayMs: 950, resetCalls: true });
+  const response = await fetch(
+    baseURL + '/en/books?category=Full+shelf&page=95',
+    {
+      headers: { 'Accept-Encoding': 'identity' },
+    },
+  );
+  expect(response.status).toBe(200);
+  const reader = response.body!.getReader();
+  const decoder = new TextDecoder();
+  try {
+    let html = '';
+    while (!html.includes('>Loading books</p>')) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      html += decoder.decode(chunk.value, { stream: true });
+    }
+    expect(html).toContain('>Book catalog</h1>');
+    expect(html).toContain('>Loading books</p>');
+    expect(html).not.toContain('Archive book 1129');
+
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      html += decoder.decode(chunk.value, { stream: true });
+    }
+    html += decoder.decode();
+    expect(html).toContain('>Archive book 1129</a>');
+    expect(await readJavaCalls(request)).toEqual([
+      {
+        path: '/api/v1/books?category=Full%20shelf&page=94&size=12',
+        cookie: null,
+        authorization: 'Bearer fixture-service',
+      },
+    ]);
+  } finally {
+    await reader.cancel();
+  }
+});
+
+test('detail HTML and BFF reuse the same public reader cache', async ({
+  request,
+}, info) => {
+  test.skip(info.project.name !== 'release');
+  await setJavaScenario(request, { resetCalls: true });
+  const id = '00000000-0000-4000-8000-000000000110';
+  const detail = await request.get('/api/v1/catalog/books/' + id, {
+    headers: { 'Accept-Language': 'en' },
+  });
+  expect(detail.status()).toBe(200);
+  const { title } = await detail.json();
+  const html = await request.get('/en/books/' + id);
+  expect(html.status()).toBe(200);
+  expect(await html.text()).toContain('>' + title + '</h1>');
+  expect(await readJavaCalls(request)).toEqual([
+    {
+      path: '/api/v1/books/' + id,
+      cookie: null,
+      authorization: 'Bearer fixture-service',
+    },
+  ]);
 });

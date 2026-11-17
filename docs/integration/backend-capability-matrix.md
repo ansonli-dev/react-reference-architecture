@@ -33,3 +33,10 @@
 
 - [BookSummaryResponse](https://github.com/ansonli-dev/explicit-architecture/blob/14e511a8f361616e166f23daf5184012d501c656/catalog/src/main/java/com/example/catalog/interfaces/rest/response/BookSummaryResponse.java)
 - [BookDetailResponse](https://github.com/ansonli-dev/explicit-architecture/blob/14e511a8f361616e166f23daf5184012d501c656/catalog/src/main/java/com/example/catalog/interfaces/rest/response/BookDetailResponse.java)
+
+## B4 目录验收
+
+- 教学 SQLite 已通过种子、查询、HTTP 及生产浏览器验收。
+- Java v1 本机 HTTP stub 已通过列表与详情映射、0-based 分页、无效上游 JSON、不安全的 `long`、超时和未知 UUID。真实 HTTP 证据待后端环境可用后补录。
+- Release 生产产物在 runtime 注入教学 profile 和有效的教学库后，仍视未配置 Java 为目录不可用。健康检查维持 200，就绪返回 503。配置有效时使用 Java 适配器。
+- [目录 walkthrough](../walkthroughs/01-catalog.md) 提供真实 OpenAPI 与受控 seed 的核验入口。J7–J8 等 Java v2 契约交付后执行。
