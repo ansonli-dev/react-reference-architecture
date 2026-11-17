@@ -42,7 +42,11 @@ for (const { source, dependencies } of report.modules) {
       break;
     directives.push(statement.expression.text);
   }
-  if (directives.includes('use client')) clientRoots.push(source);
+  if (
+    directives.includes('use client') ||
+    /^src\/features\/[^/]+\/client\.ts$/.test(source)
+  )
+    clientRoots.push(source);
   if (/^src\/features\/[^/]+\/model(?:\/|\.ts$)/.test(source))
     modelRoots.push(source);
   if (

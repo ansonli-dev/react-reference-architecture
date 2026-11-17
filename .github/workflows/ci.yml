@@ -50,3 +50,9 @@ jobs:
           name: playwright-visual-results
           path: test-results/visual-container/
           if-no-files-found: ignore
+  release-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/test-release.sh

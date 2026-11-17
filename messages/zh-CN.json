@@ -1,27 +1,20 @@
 {
   "Shell": {
     "title": "React 参考架构",
-    "description": "通过在线书店学习现代 React 应用架构。",
+    "description": "以在线书店目录为例的现代 React 应用架构参考实现。",
     "brand": "参考书店",
     "nav": "主导航",
     "home": "架构概览",
     "books": "书籍目录",
     "theme": "切换深色主题",
-    "demo": "教学模式",
+    "demo": "演示模式",
     "skip": "跳至内容",
     "notFound": "找不到这个页面",
     "backHome": "返回首页"
   },
   "Home": {
     "title": "现代 React 应用参考架构",
-    "description": "跟着一次书籍筛选，观察浏览器、Next.js 服务端和同源 HTTP 接口如何协作。",
-    "exercise": {
-      "title": "目录练习",
-      "filter": "在书籍目录选择 Architecture 并应用筛选。留意地址末尾的 <query></query>，刷新页面后仍会看到同一分类。",
-      "compare": "打开同一个筛选条件的目录页和 JSON，核对书名和库存。页面与同源 API 各自处理自己的请求，再调用同一个服务端目录读取器。",
-      "pageLink": "打开筛选后的目录",
-      "jsonLink": "查看目录 JSON"
-    },
+    "description": "在线书店的只读目录展示了浏览器、Next.js 服务端、同源 API 和业务后端如何协作。",
     "boundaries": "各层职责",
     "browser": {
       "title": "浏览器",
@@ -33,7 +26,7 @@
     },
     "bff": {
       "title": "BFF",
-      "description": "同源 HTTP 接口校验请求，并将目录结果作为 JSON 返回。"
+      "description": "校验同源 HTTP 请求，使用与页面相同的目录读取器，并返回 JSON。"
     },
     "backend": {
       "title": "业务后端",
@@ -51,6 +44,9 @@
     "retry": "重试",
     "loading": "正在加载书籍",
     "empty": "没有符合筛选条件的书籍。",
+    "results": "本页有 {count, number} 本书。",
+    "resultsCategory": "分类：{category}。",
+    "resultsQuery": "关键词：{q}。",
     "previous": "上一页",
     "next": "下一页",
     "pagination": "书籍分页",

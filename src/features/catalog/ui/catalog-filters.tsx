@@ -60,6 +60,7 @@ export function CatalogFilters({
             {labels.search}
           </label>
           <Input
+            key={query.q}
             id="catalog-query"
             type="search"
             name="q"
@@ -77,6 +78,7 @@ export function CatalogFilters({
           {labels.category}
         </label>
         <select
+          key={query.category}
           id="catalog-category"
           name="category"
           defaultValue={query.category ?? ''}

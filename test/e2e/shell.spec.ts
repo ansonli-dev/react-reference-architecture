@@ -59,3 +59,23 @@ test('the language and theme controls work from the keyboard', async ({
     page.getByRole('button', { name: 'Toggle dark theme' }),
   ).toHaveAttribute('aria-pressed', 'true');
 });
+
+test('supported locales return localized HTTP 404 pages for unknown paths', async ({
+  page,
+}) => {
+  const cases = [
+    ['zh-CN', '/does-not-exist', '找不到这个页面', '返回首页'],
+    ['en', '/does-not-exist', 'Page not found', 'Back to home'],
+    ['en', '/does-not-exist/nested', 'Page not found', 'Back to home'],
+  ];
+  for (const [locale, path, heading, home] of cases) {
+    const response = await page.goto('/' + locale + path);
+    expect(response?.status()).toBe(404);
+    await expect(page.locator('html')).toHaveAttribute('lang', locale);
+    await expect(page.getByRole('heading', { name: heading })).toBeVisible();
+    await expect(page.getByRole('link', { name: home })).toHaveAttribute(
+      'href',
+      '/' + locale,
+    );
+  }
+});

@@ -34,7 +34,7 @@ Playwright 也提供 HTTP 请求客户端。`catalog-http.spec.ts` 借用同一�
 | 安全边界       | 请求大小、来源检查和错误信息暴露。                         | 直接构造超限请求、不可接受的来源和带敏感信息的内部错误，检查对外响应。[HTTP 边界单测](../../test/unit/api-boundary.test.ts)                                                                                                                                |
 | 兼容性         | 目标浏览器和设备上的关键交互。                             | 用 Playwright 项目表达浏览器支持范围，按视口检查布局。模板默认运行 Chromium，视觉测试包含桌面与移动视口。[端到端配置](../../playwright.config.ts) · [视觉配置](../../playwright.visual.config.ts)                                                          |
 
-目录的 axe 用例等待书卡渲染、主题生效和 CSS 过渡完成，再扫描整页的 WCAG 2.1 A/AA 自动规则。焦点提示和读屏体验仍需人工评估。[Playwright 无障碍测试](https://playwright.dev/docs/accessibility-testing#scanning-for-wcag-violations) · [W3C 无障碍初步检查](https://www.w3.org/WAI/test-evaluate/preliminary/)
+目录的 axe 用例等待书卡渲染、主题生效和 CSS 过渡完成，再扫描整页的 WCAG 2.1 A/AA 自动规则。Chromium 键盘用例验证筛选后继续 Tab、浏览器 Back 恢复、结果状态节点原位更新，以及相同数量的关键词变化。自动用例不测读屏播报；目前未运行真实读屏评估。桌面与移动视口均用 Chromium，未覆盖 Firefox、WebKit 或实体移动设备。[Playwright 无障碍测试](https://playwright.dev/docs/accessibility-testing#scanning-for-wcag-violations)
 
 ## 编写用例
 
@@ -47,6 +47,8 @@ Playwright 也提供 HTTP 请求客户端。`catalog-http.spec.ts` 借用同一�
 安装依赖后，可直接运行静态检查以及 Vitest 的单元与集成测试。只检查筛选表单时，运行 `pnpm test test/integration/catalog-filters.test.tsx`。
 
 ```bash
+pnpm install --frozen-lockfile
+pnpm peers check
 pnpm check
 pnpm api:check
 pnpm test
@@ -58,6 +60,7 @@ Playwright 使用 `demo` 和 `release` 生产产物，配置会启动隔离的�
 pnpm build
 pnpm build:demo
 pnpm exec playwright install chromium --only-shell
+unset BOOKSTORE_E2E_DEV
 pnpm test:e2e
 ```
 
@@ -66,3 +69,7 @@ pnpm test:e2e
 ```bash
 bash scripts/test-visual.sh
 ```
+
+真实 Java 使用 [运行手册](../operations/run-and-release.md#真实-java-v1-复验) 中固定版本和独立数据，运行 `pnpm test:e2e:java`。它通过正式构建对照 Java 的 OpenAPI、BFF、RSC 与浏览器结果；故障、超时和日志关联仍在普通 E2E 的替身上注入。容器交付用 `bash scripts/test-release.sh` 在内部 Docker 网络验证参考镜像。
+
+记录受控缓存基线时用 `pnpm test:e2e --project=release -g 'cold BFF result' --reporter=list,json` 并将 `PLAYWRIGHT_JSON_OUTPUT_NAME` 指到单独报告路径。报告附件 `catalog-cache-baseline.json` 标明 Node 版本、冷 BFF、热页面与热 BFF 的实际耗时和上游调用次数。耗时供同环境对照；门禁依据调用次数、流式外壳顺序和超时分类。生产 E2E 测试启动器还把每个服务的 stdout/stderr 复制到临时目录中的独立日志，供请求 ID 和降级事件断言。

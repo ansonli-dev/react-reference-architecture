@@ -1,7 +1,16 @@
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { defineConfig, devices } from '@playwright/test';
 import { emptyCatalogPorts } from './test/support/java-catalog-stub.mjs';
 
 const dev = process.env.BOOKSTORE_E2E_DEV === '1';
+if (!dev) {
+  // Playwright workers reload this config and inherit the runner's directory.
+  process.env.BOOKSTORE_E2E_LOG_DIR ??= mkdtempSync(
+    join(tmpdir(), 'bookstore-e2e-logs-'),
+  );
+}
 const targets = dev
   ? [{ name: 'dev', port: 3210 }]
   : [

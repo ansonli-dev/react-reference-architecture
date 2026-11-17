@@ -19,10 +19,12 @@
 | `app` 和 `server` 通过公开入口组合 feature。`ui/` 等内部实现由所属模块持有。                       | `feature-public-entries`                                 |
 | feature 在仓库内依赖本模块及 `shared`，跨功能组合留在装配层。                                      | `no-cross-feature`、`features-do-not-import-composition` |
 | `shared` 独立于 `app`、`features`、`server`、`i18n` 和 `mocks`。                                   | `shared-is-independent`                                  |
-| feature 模型保持纯逻辑。框架、界面、HTTP 和服务端 I/O 各自由对应入口处理。                         | `pure-model`                                             |
+| feature 模型保持纯逻辑。框架、界面、HTTP 和服务端 I/O 各自由对应入口处理。                         | `pure-model`、ESLint `no-restricted-globals`             |
 | 服务端读取与配置通过 `import 'server-only'` 标记。浏览器入口及其运行时依赖只访问客户端可用的模块。 | `no-client-to-server`、Next.js 构建                      |
 
 用可静态解析的字符串字面量编写 `import()` 路径。客户端和模型的约束沿运行时依赖检查，别名导入和间接依赖同样受约束。[依赖配置](../../.dependency-cruiser.cjs) · [架构检查脚本](../../scripts/check-boundaries.mjs)
+
+`client.ts` 即使只从 RSC 使用，也和带 `'use client'` 的模块一样是检查起点。传递依赖检查排除纯类型边。模型的依赖图会拒绝已标记的服务端模块、Node 内置模块以及规则列出的前端框架和 HTTP 客户端。全局 `fetch`（含 `globalThis.fetch`）的 Lint 限制覆盖 `model.ts` 和 `model/` 下源码中的直接调用等静态引用；对绕过静态引用的运行时 I/O 仍需评审。[组合方式 ADR](../adr/0003-frontend-module-composition.md)
 
 ## 渲染与状态
 
@@ -45,6 +47,8 @@
 ## 约束验证
 
 `pnpm check` 包含类型、Lint、格式和架构检查。架构测试覆盖跨 feature 导入、绕过公开入口和客户端间接引入服务端模块等反例。生产构建与页面 E2E 覆盖一次导航中服务端 HTML、客户端筛选、语言切换和缺失页反馈。[架构约束测试](../../test/unit/architecture.test.ts) · [目录页面 E2E](../../test/e2e/catalog-journey.spec.ts)
+
+新增功能时，先在 `src/features/<feature>/model.ts` 放置模型和校验，按实际使用需求设立 `client.ts`、`server.ts` 入口，再从 `src/app/` 或 `src/server/` 组合。修改 HTTP 契约时，从 [BFF 定义](../../contracts/bff/v1.yaml) 或 [Java v1 快照](../../contracts/java/catalog-v1.yaml) 更新，运行 `pnpm api:generate` 并一起提交 [BFF 类型](../../src/shared/api/generated/) 或 [Java 类型](../../src/server/adapters/java/generated/)。用模型单测验证输入规则、适配器集成测试验证上游映射、生产 HTTP 或浏览器用例验证公开行为。切换运行环境或改变依赖边界时记录 ADR。
 
 ### 可视化回归
 
