@@ -1,0 +1,36 @@
+{
+  "Shell": {
+    "title": "React Reference Architecture",
+    "description": "Learn modern React application architecture through a working bookstore.",
+    "brand": "Reference Books",
+    "nav": "Main navigation",
+    "home": "Architecture",
+    "books": "Book catalog",
+    "theme": "Toggle dark theme",
+    "demo": "Teaching mode",
+    "skip": "Skip to content",
+    "notFound": "Page not found",
+    "backHome": "Back to home"
+  },
+  "Home": {
+    "title": "Modern React reference architecture",
+    "description": "Browse the bookstore to see how server rendering, client interactions, and a BFF work together.",
+    "boundaries": "Application responsibilities",
+    "browser": {
+      "title": "Browser",
+      "description": "Interactive components, forms, and client drafts"
+    },
+    "renderer": {
+      "title": "Next.js server",
+      "description": "Page rendering, route composition, and data access"
+    },
+    "bff": {
+      "title": "BFF",
+      "description": "Sessions, API aggregation, and backend adaptation"
+    },
+    "backend": {
+      "title": "Business backend",
+      "description": "Business rules, transactions, and authoritative data"
+    }
+  }
+}

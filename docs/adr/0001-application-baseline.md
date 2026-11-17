@@ -29,3 +29,14 @@ Node `24.15.0` 与 pnpm `11.25.0` 下，原锁文件可冻结安装，`pnpm peer
 | A3   | [next-intl 4.15.1](https://www.npmjs.com/package/next-intl/v/4.15.1)、[Lucide 1.73.0](https://www.npmjs.com/package/lucide-react/v/1.73.0)、[Playwright 1.65.1](https://www.npmjs.com/package/@playwright/test/v/1.65.1) |
 | A4   | [openapi-typescript 7.13.0](https://www.npmjs.com/package/openapi-typescript/v/7.13.0)、[openapi-fetch 0.17.0](https://www.npmjs.com/package/openapi-fetch/v/0.17.0)                                                     |
 | A5   | [React Testing Library 16.3.3](https://www.npmjs.com/package/@testing-library/react/v/16.3.3)、[jsdom 31.0.1](https://www.npmjs.com/package/jsdom/v/31.0.1)、[MSW 3.0.6](https://www.npmjs.com/package/msw/v/3.0.6)      |
+
+## 双语外壳与组件来源
+
+外壳固定 `zh-CN` 和 `en`。默认语言由路由决定。主题切换在浏览器保存选择，静态 HTML 与首次 hydration 使用相同默认值。使用系统字形，不在构建时抓取字体。Next.js 的 `agentRules` 关闭，以免开发 smoke 自动修改仓库维护的 `AGENTS.md`。
+
+Button 和 Input 从 2026-11-17 可访问的官方 shadcn `new-york-v4` registry 源码移植。记录的 SHA-256 对应 registry JSON 的 `files[0].content`。实现映射了项目别名和色彩变量，按钮使用独立的 Radix Slot 包。
+
+| 组件   | 官方来源                                                                          | 源码 SHA-256                                                       |
+| ------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| Button | [new-york-v4/button.json](https://ui.shadcn.com/r/styles/new-york-v4/button.json) | `79dd6f75f8136394442202d6b8b922fb269eaad0a5dba579397c9d5b41f893bb` |
+| Input  | [new-york-v4/input.json](https://ui.shadcn.com/r/styles/new-york-v4/input.json)   | `0c9457181f6ddc80969bcf854e92c362903a55b6e889fbef3fd85343ecc4af5b` |

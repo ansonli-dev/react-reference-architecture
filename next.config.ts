@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import createNextIntlPlugin from 'next-intl/plugin';
 import { profiles } from './scripts/build-profiles.mjs';
 
 const profile =
@@ -6,6 +7,7 @@ const profile =
 const { distDir, tsconfigPath } = profiles[profile];
 
 const nextConfig: NextConfig = {
+  agentRules: false,
   distDir,
   typescript: { tsconfigPath },
   env: { BOOKSTORE_BUILD_PROFILE: profile },
@@ -22,4 +24,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default createNextIntlPlugin()(nextConfig);

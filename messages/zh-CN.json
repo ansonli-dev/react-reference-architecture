@@ -1,0 +1,33 @@
+{
+  "Shell": {
+    "title": "React 参考架构",
+    "description": "通过在线书店学习现代 React 应用架构。",
+    "brand": "参考书店",
+    "nav": "主导航",
+    "home": "架构概览",
+    "books": "书籍目录",
+    "theme": "切换深色主题",
+    "demo": "教学模式",
+    "skip": "跳至内容",
+    "notFound": "找不到这个页面",
+    "backHome": "返回首页"
+  },
+  "Home": {
+    "title": "现代 React 应用参考架构",
+    "description": "从浏览书籍开始，了解服务端渲染、客户端交互和 BFF 如何协作。",
+    "boundaries": "各层职责",
+    "browser": {
+      "title": "浏览器",
+      "description": "组件交互、表单和客户端草稿"
+    },
+    "renderer": {
+      "title": "Next.js 服务端",
+      "description": "页面渲染、路由组合和数据获取"
+    },
+    "bff": { "title": "BFF", "description": "会话、接口聚合和后端适配" },
+    "backend": {
+      "title": "业务后端",
+      "description": "业务规则、事务和权威数据"
+    }
+  }
+}

@@ -8,5 +8,5 @@
     ".next-demo/types/**/*.ts",
     ".next-demo/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", ".next"]
+  "exclude": ["node_modules", ".next", ".next-demo/dev"]
 }
