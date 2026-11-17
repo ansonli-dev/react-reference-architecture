@@ -1,13 +1,14 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { BookOpen } from 'lucide-react';
+import { BookOpen, Library, ReceiptText, ShoppingBag } from 'lucide-react';
 import { hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
 import { ThemeSwitch } from '@/shared/ui/theme-switch';
-import { LanguageLink, LanguageSwitch } from './language-switch';
+import { LanguageSwitch } from './language-switch';
 import { SkipLink } from './skip-link';
+import { StoreLink } from './store-link';
 import '../globals.css';
 
 export function generateStaticParams() {
@@ -30,52 +31,76 @@ export default async function LocaleLayout({
   setRequestLocale(locale);
   const t = await getTranslations({ locale, namespace: 'Shell' });
   const target = locale === 'zh-CN' ? 'en' : 'zh-CN';
+  const language = target === 'en' ? 'English' : '简体中文';
+  const shop = process.env.BOOKSTORE_BUILD_PROFILE === 'demo';
 
   return (
     <html lang={locale}>
       <body>
         <SkipLink label={t('skip')} />
         <header className="border-line bg-surface border-b">
-          <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-5 gap-y-2 px-5 py-3 sm:px-8">
+          <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-x-6 gap-y-1 px-4 py-2 sm:px-8 sm:py-3">
             <Link
-              href={'/' + locale}
-              className="text-primary flex items-center gap-2 rounded-md font-semibold"
+              href={'/' + locale + '/books'}
+              className="flex min-h-11 items-center gap-2.5 rounded-md font-bold tracking-tight"
             >
-              <BookOpen size={23} aria-hidden /> {t('brand')}
+              <span className="bg-primary text-primary-foreground grid size-8 place-items-center rounded-lg">
+                <BookOpen size={18} aria-hidden />
+              </span>
+              {t('brand')}
             </Link>
             <nav
               aria-label={t('nav')}
-              className="flex w-full flex-wrap items-center justify-between gap-y-1 min-[360px]:gap-x-1 sm:w-auto sm:gap-4"
+              className="flex w-full flex-wrap items-center gap-x-1 gap-y-1 sm:w-auto sm:gap-x-3"
             >
-              <Link
-                href={'/' + locale}
-                className="text-muted hover:bg-accent rounded-md px-1.5 py-2 text-sm max-[359px]:text-xs sm:px-2"
-              >
-                {t('home')}
-              </Link>
-              <Link
-                href={'/' + locale + '/books'}
-                prefetch={false}
-                className="hover:bg-accent rounded-md px-1.5 py-2 text-sm font-semibold max-[359px]:text-xs sm:px-2"
-              >
+              <StoreLink href={'/' + locale + '/books'}>
+                <Library
+                  size={16}
+                  aria-hidden
+                  className="hidden min-[480px]:block"
+                />{' '}
                 {t('books')}
-              </Link>
-              <Suspense fallback={<LanguageLink target={target} />}>
-                <LanguageSwitch target={target} />
+              </StoreLink>
+              {shop && (
+                <>
+                  <StoreLink href={'/' + locale + '/cart'}>
+                    <ShoppingBag
+                      size={16}
+                      aria-hidden
+                      className="hidden min-[480px]:block"
+                    />{' '}
+                    {t('cart')}
+                  </StoreLink>
+                  <StoreLink href={'/' + locale + '/orders'}>
+                    <ReceiptText
+                      size={16}
+                      aria-hidden
+                      className="hidden min-[480px]:block"
+                    />{' '}
+                    {t('orders')}
+                  </StoreLink>
+                </>
+              )}
+              <Suspense
+                fallback={
+                  <span
+                    aria-hidden
+                    className="inline-flex min-h-11 items-center px-2 text-sm font-medium"
+                  >
+                    {language}
+                  </span>
+                }
+              >
+                <LanguageSwitch target={target} label={language} />
               </Suspense>
               <ThemeSwitch label={t('theme')} />
             </nav>
           </div>
         </header>
-        {process.env.BOOKSTORE_BUILD_PROFILE === 'demo' && (
-          <p className="bg-accent text-primary px-5 py-2 text-center text-sm font-semibold">
-            {t('demo')}
-          </p>
-        )}
         <main
           id="main"
           tabIndex={-1}
-          className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14"
+          className="mx-auto max-w-[1240px] px-4 pt-7 pb-16 sm:px-8 sm:pt-10"
         >
           {children}
         </main>

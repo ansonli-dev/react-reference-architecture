@@ -2,7 +2,7 @@
 
 **在线书店 · 前端架构参考实现**
 
-本项目以在线书店的只读书籍目录为例，展示业务模块、服务端渲染、浏览器交互和同源 HTTP 接口如何协作。首页概述各层职责，书籍目录提供筛选、分页和详情。代码的路径和导入关系标明模块归属、运行环境和依赖方向。
+本项目以「页间书店」为例，展示业务模块、服务端渲染、浏览器交互和同源 HTTP 接口如何协作。本地 demo 可以选书、调整购物车、演示下单并查看订单。代码的路径和导入关系标明模块归属、运行环境和依赖方向。
 
 ## 本地启动
 
@@ -15,7 +15,7 @@ pnpm demo:seed
 pnpm dev:mock
 ```
 
-打开 [中文首页](http://127.0.0.1:3000/zh-CN)、[英文首页](http://127.0.0.1:3000/en) 或 [书籍目录](http://127.0.0.1:3000/zh-CN/books)。种子和进程由开发者在命令行准备，浏览器里的书籍目录是只读的。发布模式使用 Java v1，提供分类、分页与详情；关键词搜索由 SQLite 演示模式提供。[运行与发布手册](docs/operations/run-and-release.md)
+打开 [中文书籍目录](http://127.0.0.1:3000/zh-CN/books) 或 [英文书籍目录](http://127.0.0.1:3000/en/books)。从列表进入详情加购，在购物车选择「核对报价」，确认书目和金额后「演示下单」，随后进入我的订单。购物车、报价、订单和库存保存在本地 SQLite，私有数据按浏览器区分。已有 demo 数据时重新运行 `pnpm demo:seed` 即可升级表结构并保留数据。发布模式连接 Java v1 目录。[运行与发布手册](docs/operations/run-and-release.md) · [Java 购书接入需求](docs/operations/java-checkout-integration.md)
 
 ## 架构演进之路
 
@@ -139,11 +139,12 @@ flowchart TD
 
 ## 延伸阅读
 
-| 文档                                                   | 内容                                                    |
-| ------------------------------------------------------ | ------------------------------------------------------- |
-| [前端架构概览](docs/architecture/overview.md)          | 浏览器与 Next.js 的职责、RSC 和 HTTP 入口、状态所有权。 |
-| [前端架构规范](docs/architecture/architecture-spec.md) | 目录布局、公开入口、依赖方向、错误响应和 UI 约定。      |
-| [架构决策记录](docs/adr/README.md)                     | 工程基线、公开读取缓存和模块组合的背景和取舍。          |
-| [前端测试体系](docs/testing-strategy/README.md)        | 测试层级、测试类型、用例示例和运行入口。                |
-| [运行与发布手册](docs/operations/run-and-release.md)   | 演示启动、真实 Java 校验、镜像发布与回滚。              |
-| [文档索引](docs/README.md)                             | 仓库内架构文档入口。                                    |
+| 文档                                                              | 内容                                                    |
+| ----------------------------------------------------------------- | ------------------------------------------------------- |
+| [前端架构概览](docs/architecture/overview.md)                     | 浏览器与 Next.js 的职责、RSC 和 HTTP 入口、状态所有权。 |
+| [前端架构规范](docs/architecture/architecture-spec.md)            | 目录布局、公开入口、依赖方向、错误响应和 UI 约定。      |
+| [架构决策记录](docs/adr/README.md)                                | 工程基线、公开读取缓存和模块组合的背景和取舍。          |
+| [前端测试体系](docs/testing-strategy/README.md)                   | 测试层级、测试类型、用例示例和运行入口。                |
+| [运行与发布手册](docs/operations/run-and-release.md)              | 演示启动、真实 Java 校验、镜像发布与回滚。              |
+| [Java 购书接入需求](docs/operations/java-checkout-integration.md) | v2 已有能力、后端改造项和联调验收。                     |
+| [文档索引](docs/README.md)                                        | 仓库内架构文档入口。                                    |

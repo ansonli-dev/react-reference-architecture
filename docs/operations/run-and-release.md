@@ -1,16 +1,17 @@
 # 运行与发布手册
 
-本参考实现提供同一套只读书籍目录的两个构建档位。使用 Node 24、pnpm 11.25.0 和锁文件，验证环境固定用 Node 24.15.0。
+本参考实现提供可独立运行的本地购书 demo，以及连接 Java v1 目录的发布构建。使用 Node 24、pnpm 11.25.0 和锁文件，验证环境固定用 Node 24.15.0。
 
-|                | 演示 `demo`                          | 发布 `release`             |
-| -------------- | ------------------------------------ | -------------------------- |
-| 数据           | 独立 SQLite 种子                     | Java v1 Catalog            |
-| 目录能力       | 分类、关键词、分页、详情             | 分类、分页、详情           |
-| 开发           | `pnpm dev:mock`                      | `pnpm dev:real`            |
-| 生产构建、启动 | `pnpm build:demo`、`pnpm start:demo` | `pnpm build`、`pnpm start` |
-| 产物           | `.next-demo/`                        | `.next/`                   |
+|                | 演示 `demo`                          | 发布 `release`                                             |
+| -------------- | ------------------------------------ | ---------------------------------------------------------- |
+| 数据           | 独立 SQLite 种子                     | Java v1 Catalog                                            |
+| 目录能力       | 分类、关键词、分页、详情             | 分类、分页、详情                                           |
+| 购书能力       | 购物车、演示下单、本浏览器的订单记录 | Java v2 接入需求见[联调清单](java-checkout-integration.md) |
+| 开发           | `pnpm dev:mock`                      | `pnpm dev:real`                                            |
+| 生产构建、启动 | `pnpm build:demo`、`pnpm start:demo` | `pnpm build`、`pnpm start`                                 |
+| 产物           | `.next-demo/`                        | `.next/`                                                   |
 
-构建时不需要数据源。两个模式的 `/en` 与 `/zh-CN` 概览都可以预渲染。启动后，`GET /api/health` 返回进程存活状态，`GET /api/ready` 会实际读一次目录。数据源缺失、不可读或配置不合法时，就绪返回 503 与有限的原因码；进程健康仍可返回 200。已知语言的未匹配路径返回本地化 HTTP 404。书籍详情流式缺失时响应头可能已是 200，同一书号的 BFF 响应仍是 404。
+两个模式的 `/en` 与 `/zh-CN` 都重定向到对应语言的书籍目录。目录在运行时读取数据，构建可独立执行。启动后，`GET /api/health` 返回进程存活状态，`GET /api/ready` 会实际读一次目录。数据源缺失、不可读或配置不合法时，就绪返回 503 与有限的原因码；进程健康仍可返回 200。已知语言的未匹配路径返回本地化 HTTP 404。书籍详情流式缺失时响应头可能已是 200，同一书号的 BFF 响应仍是 404。
 
 ## 配置
 
@@ -25,6 +26,8 @@
 | `JAVA_CATALOG_TOKEN`      | 上游要求时配置服务凭据，由服务端作为 Bearer 发送。通过部署环境注入。                                               |
 
 按 [README](../../README.md#本地启动) 在干净检出执行冻结安装、导出数据目录、种子和开发启动。访问 `/zh-CN/books`，或从另一终端用 `curl -fsS http://127.0.0.1:3000/api/v1/catalog/books` 核对只读结果。
+
+旧版 demo 数据用同一个 `DEMO_DATA_DIR` 重跑 `pnpm demo:seed`，即可添加购物车与订单表。种子只补缺失的书籍，已有书目、库存及订单会保留。购物车和订单以浏览器的 `bookstore-shopper` Cookie 区分，使用同一个浏览器和访问域名即可继续试用。结算按币种生成订单，库存和订单在同一 SQLite 事务写入。URL 端口与 `APP_ORIGIN` 要一致，例如 `PORT=3001 APP_ORIGIN=http://127.0.0.1:3001 pnpm dev:mock`。
 
 Java v1 返回零基分页数组，没有总数。前端将其转为 1–100 页，每页 12 本。未达上限的满页会在同一个 2 秒截止时间内再查询下一页，只有收到非空下一页才给出翻页链接。v1 未保证稳定排序，也没有跨请求的快照；并发变化时探查与随后浏览可能看到不同结果。对公开缓存范围和时间的说明见 [ADR 0002](../adr/0002-public-reads-and-cache.md)。
 
@@ -126,7 +129,7 @@ docker build --label "org.opencontainers.image.revision=$release_sha" -t "bookst
 docker image inspect --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}' "bookstore:$release_sha"
 ```
 
-烟测创建无外网出站的内部 Docker 网络，用临时 Java 替身验证已配置和未配置模式的就绪边界、双语首页、实际 CSS 或 JS 资源与同源 BFF，然后清理测试资源。部署时让镜像加入可访问 Java 的网络，从受保护的运行配置注入上游 origin 与凭据。以下示例用回环访问，并假定 `$release_env_file` 是已准备的配置文件，`$catalog_network` 是已有的网络：
+烟测创建无外网出站的内部 Docker 网络，用临时 Java 替身验证已配置和未配置模式的就绪边界、双语目录入口、实际 CSS 或 JS 资源与同源 BFF，然后清理测试资源。部署时让镜像加入可访问 Java 的网络，从受保护的运行配置注入上游 origin 与凭据。以下示例用回环访问，并假定 `$release_env_file` 是已准备的配置文件，`$catalog_network` 是已有的网络：
 
 ```bash
 docker run -d --name bookstore-current --network "$catalog_network" \

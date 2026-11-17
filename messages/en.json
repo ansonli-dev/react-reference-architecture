@@ -1,37 +1,16 @@
 {
   "Shell": {
-    "title": "React Reference Architecture",
-    "description": "A reference architecture for modern React applications, built around an online book catalog.",
-    "brand": "Reference Books",
+    "title": "Between Pages",
+    "description": "Discover books on architecture, programming and engineering.",
+    "brand": "Between Pages",
     "nav": "Main navigation",
-    "home": "Architecture",
     "books": "Book catalog",
+    "cart": "Cart",
+    "orders": "Orders",
     "theme": "Toggle dark theme",
-    "demo": "Demo mode",
     "skip": "Skip to content",
     "notFound": "Page not found",
-    "backHome": "Back to home"
-  },
-  "Home": {
-    "title": "Modern React reference architecture",
-    "description": "The bookstore catalog shows how the browser, Next.js server, same-origin API, and backend work together.",
-    "boundaries": "Application responsibilities",
-    "browser": {
-      "title": "Browser",
-      "description": "Takes the filter input and stores the applied category and page in the URL."
-    },
-    "renderer": {
-      "title": "Next.js server",
-      "description": "Reads the URL and catalog data to render the book cards on the server."
-    },
-    "bff": {
-      "title": "BFF",
-      "description": "Validates same-origin HTTP requests, uses the same catalog reader as the page, and returns JSON."
-    },
-    "backend": {
-      "title": "Business backend",
-      "description": "Java Catalog supplies titles, prices, and stock in release mode."
-    }
+    "backToCatalog": "Back to books"
   },
   "Catalog": {
     "title": "Book catalog",
@@ -58,6 +37,56 @@
     "back": "Back to books",
     "stock": "{count, plural, one {# copy in stock} other {# copies in stock}}",
     "soldOut": "Out of stock",
-    "price": "Price"
+    "price": "Price",
+    "author": "By {name}",
+    "aboutBook": "About this book"
+  },
+  "Checkout": {
+    "cart": "Your cart",
+    "orders": "Your orders",
+    "add": "Add to cart",
+    "adding": "Adding to cart…",
+    "quantity": "Quantity",
+    "update": "Update quantity",
+    "remove": "Remove {title}",
+    "removeLabel": "Remove",
+    "browse": "Continue browsing",
+    "emptyCart": "Your cart is empty.",
+    "emptyOrders": "No orders yet.",
+    "subtotal": "Subtotal",
+    "summary": "Order summary",
+    "itemCount": "{count, plural, one {# book} other {# books}}",
+    "unitPrice": "Unit price {price}",
+    "total": "Total",
+    "placeOrder": "Place demo order",
+    "quote": "Review quote",
+    "quoting": "Getting quote…",
+    "confirmQuote": "Confirm quote",
+    "expiresAt": "Quote valid until {time}",
+    "backToCart": "Back to cart",
+    "placing": "Placing order…",
+    "placed": "Order placed.",
+    "orderedAt": "Placed on",
+    "placedStatus": "Placed",
+    "order": "Order {id}",
+    "orderLine": "{quantity, number} × {price}",
+    "loading": "Loading…",
+    "retry": "Try again",
+    "notices": {
+      "invalid": "Choose a valid quantity and try again.",
+      "missing": "This book is no longer available.",
+      "stock": "Stock has changed. Reduce the quantity and try again.",
+      "limit": "You can add up to 20 different books to your cart.",
+      "changed": "Your cart or prices changed. Review the updated cart before placing your order.",
+      "empty": "There are no books to order in this currency.",
+      "total": "This subtotal is too large. Reduce the quantity and try again.",
+      "unavailable": "The bookstore is temporarily unavailable. Try again.",
+      "quoteMissing": "This quote is unavailable. Review your cart and get a new quote.",
+      "expired": "This quote has expired. Get a new quote.",
+      "consumed": "This quote was already submitted. Check your orders.",
+      "conflict": "This submission conflicts with an existing record. Review a new quote.",
+      "processing": "Your order is processing. Submit the same quote to check its status.",
+      "reconcile": "Your order is under review. Submit the same quote to check its status."
+    }
   }
 }

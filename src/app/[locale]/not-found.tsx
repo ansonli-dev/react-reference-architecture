@@ -8,10 +8,10 @@ export default async function NotFound() {
     <section>
       <h1 className="font-display text-4xl">{t('notFound')}</h1>
       <Link
-        href={'/' + locale}
+        href={'/' + locale + '/books'}
         className="text-primary mt-5 inline-block underline"
       >
-        {t('backHome')}
+        {t('backToCatalog')}
       </Link>
     </section>
   );

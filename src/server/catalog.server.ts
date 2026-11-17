@@ -1,6 +1,6 @@
 import 'server-only';
 import { createHash } from 'node:crypto';
-import { cacheLife, cacheTag } from 'next/cache';
+import { cacheLife, cacheTag, revalidateTag } from 'next/cache';
 import type { CatalogQuery } from '@/features/catalog/model';
 import type { CatalogPort } from '@/features/catalog/server';
 import type { Locale } from '@/i18n/routing';
@@ -72,6 +72,15 @@ function cacheScope(source: CatalogSource, locale: Locale) {
 
 type Scope = ReturnType<typeof cacheScope>;
 
+const listsTag = 'catalog:lists';
+const bookTag = (id: string) => 'catalog:book:' + id;
+
+export function expireCatalogStock(bookIds: string[]) {
+  if (!bookIds.length) return;
+  revalidateTag(listsTag, { expire: 0 });
+  for (const id of bookIds) revalidateTag(bookTag(id), { expire: 0 });
+}
+
 const cacheFailurePrefix = 'bookstore:catalog:';
 const cacheFailureCodes = [
   'CATALOG_UNAVAILABLE',
@@ -106,14 +115,14 @@ function restoreCacheError(error: unknown): never {
 async function cachedList(key: { scope: Scope; query: CatalogQuery }) {
   'use cache';
   cacheLife({ stale: 0, revalidate: 60, expire: 300 });
-  cacheTag('catalog:lists');
+  cacheTag(listsTag);
   return cacheRead((port) => port.list(key.query));
 }
 
 async function cachedBook(key: { scope: Scope; bookId: string }) {
   'use cache';
   cacheLife({ stale: 0, revalidate: 60, expire: 300 });
-  cacheTag('catalog:book:' + key.bookId);
+  cacheTag(bookTag(key.bookId));
   return cacheRead((port) => port.get(key.bookId));
 }
 

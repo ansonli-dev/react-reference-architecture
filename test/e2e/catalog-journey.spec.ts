@@ -36,7 +36,7 @@ test('server-rendered markup contains real book links and supports detail naviga
   const detail = page
     .getByRole('article')
     .filter({ has: page.getByRole('heading', { name: title }) });
-  await expect(detail.getByText('林岚', { exact: true })).toBeVisible();
+  await expect(detail.getByText('作者 林岚', { exact: true })).toBeVisible();
   await expect(detail.getByText('库存 5 本', { exact: true })).toBeVisible();
   const price = new Intl.NumberFormat('zh-CN', {
     style: 'currency',

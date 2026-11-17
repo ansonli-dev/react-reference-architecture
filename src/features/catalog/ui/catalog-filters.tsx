@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { SlidersHorizontal } from 'lucide-react';
+import { Search } from 'lucide-react';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 import type { CatalogQuery } from '../model';
@@ -38,7 +38,7 @@ export function CatalogFilters({
     <form
       action={base}
       method="get"
-      className="border-line bg-surface flex flex-wrap items-end gap-4 rounded-lg border p-4 sm:p-5"
+      className="border-line bg-surface grid grid-cols-[minmax(0,1fr)_auto] items-end gap-3 rounded-xl border p-3 sm:flex sm:p-4"
       onSubmit={(event) => {
         event.preventDefault();
         const form = new FormData(event.currentTarget);
@@ -52,25 +52,33 @@ export function CatalogFilters({
       }}
     >
       {search && (
-        <div className="min-w-40 grow">
+        <div className="col-span-2 min-w-0 grow">
           <label
             htmlFor="catalog-query"
             className="mb-1.5 block text-sm font-semibold"
           >
             {labels.search}
           </label>
-          <Input
-            key={query.q}
-            id="catalog-query"
-            type="search"
-            name="q"
-            placeholder={labels.searchHint}
-            maxLength={64}
-            defaultValue={query.q}
-          />
+          <div className="relative">
+            <Search
+              size={17}
+              aria-hidden
+              className="text-muted pointer-events-none absolute top-3.5 left-3"
+            />
+            <Input
+              key={query.q}
+              id="catalog-query"
+              type="search"
+              name="q"
+              placeholder={labels.searchHint}
+              maxLength={64}
+              defaultValue={query.q}
+              className="h-11 pl-9"
+            />
+          </div>
         </div>
       )}
-      <div className="min-w-36 grow sm:grow-0">
+      <div className="min-w-0 sm:w-48">
         <label
           htmlFor="catalog-category"
           className="mb-1.5 block text-sm font-semibold"
@@ -82,7 +90,7 @@ export function CatalogFilters({
           id="catalog-category"
           name="category"
           defaultValue={query.category ?? ''}
-          className="border-input bg-surface focus-visible:outline-ring h-10 w-full max-w-full rounded-md border px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+          className="border-input bg-surface focus-visible:outline-ring h-11 w-full max-w-full rounded-md border px-3 text-base focus-visible:outline-2 focus-visible:outline-offset-2 sm:text-sm"
         >
           <option value="">{labels.allCategories}</option>
           {options.map((category) => (
@@ -92,8 +100,7 @@ export function CatalogFilters({
           ))}
         </select>
       </div>
-      <Button type="submit">
-        <SlidersHorizontal aria-hidden />
+      <Button type="submit" className="h-11">
         {labels.apply}
       </Button>
     </form>

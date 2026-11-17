@@ -50,6 +50,8 @@ test('skips the header and submits catalog filters using the keyboard', async ({
   ).toBe(true);
   await expect(apply).toBeFocused();
   await page.keyboard.press('Tab');
+  await expect(main.getByRole('link', { name: 'Reset filters' })).toBeFocused();
+  await page.keyboard.press('Tab');
   await expect(books.first().getByRole('link')).toBeFocused();
 
   await page.goBack();

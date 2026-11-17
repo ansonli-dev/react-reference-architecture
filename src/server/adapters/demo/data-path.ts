@@ -2,6 +2,8 @@ import { lstatSync } from 'node:fs';
 import { isAbsolute, join, normalize, parse } from 'node:path';
 import { z } from 'zod';
 
+export const demoSchemaVersion = 3;
+
 export const demoDataDir = z
   .string()
   .refine(

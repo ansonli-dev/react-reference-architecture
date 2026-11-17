@@ -14,6 +14,9 @@ bookstore_image='mcr.microsoft.com/playwright:v1.65.1-noble@sha256:56be08aca06bf
 
 # A fresh checkout in the container keeps the host build and node_modules separate.
 git ls-files --cached --others --exclude-standard -z |
+  while IFS= read -r -d '' path; do
+    if [[ -e $path || -L $path ]]; then printf '%s\0' "$path"; fi
+  done |
   COPYFILE_DISABLE=1 tar -c -f - --no-xattrs --null -T - |
   docker run --rm --interactive --init --ipc=host --platform linux/arm64 \
     --env NEXT_TELEMETRY_DISABLED=1 \

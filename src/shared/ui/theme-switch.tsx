@@ -39,6 +39,7 @@ export function ThemeSwitch({ label }: { label: string }) {
       type="button"
       variant="ghost"
       size="icon"
+      className="size-11"
       aria-label={label}
       aria-pressed={dark}
       onClick={() => {
