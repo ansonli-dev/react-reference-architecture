@@ -3,20 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node scripts/run-app.mjs dev release",
+    "build": "node scripts/run-app.mjs build release",
+    "start": "node scripts/run-app.mjs start release",
     "lint": "eslint",
-    "typecheck": "next typegen && tsc --noEmit",
+    "typecheck": "node scripts/run-app.mjs typegen release && tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "check:architecture": "depcruise src --config .dependency-cruiser.cjs",
-    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm check:architecture"
+    "check": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm check:architecture",
+    "dev:mock": "node scripts/run-app.mjs dev demo",
+    "dev:real": "node scripts/run-app.mjs dev release",
+    "build:demo": "node scripts/run-app.mjs build demo",
+    "start:demo": "node scripts/run-app.mjs start demo"
   },
   "dependencies": {
     "next": "16.4.6",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "server-only": "0.0.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
@@ -30,7 +36,8 @@
     "prettier": "^3.9.10",
     "prettier-plugin-tailwindcss": "^0.8.1",
     "tailwindcss": "^4",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "5.1.0"
   },
   "packageManager": "pnpm@11.25.0",
   "engines": {
