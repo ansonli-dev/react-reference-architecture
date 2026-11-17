@@ -68,13 +68,14 @@ for (const origin of [ready, empty]) {
   assert.deepEqual(await health.json(), { status: 'ok' });
 
   for (const locale of ['en', 'zh-CN']) {
-    const home = await get(origin, '/' + locale);
-    assert.equal(home.status, 200, origin + '/' + locale);
-    const html = await home.text();
+    const catalogPage = await get(origin, '/' + locale);
+    assert.equal(catalogPage.status, 200, origin + '/' + locale);
+    assert.equal(new URL(catalogPage.url).pathname, '/' + locale + '/books');
+    const html = await catalogPage.text();
     assert.ok(html.includes('<html lang="' + locale + '"'));
     assert.ok(html.includes('href="/' + locale + '/books"'));
     const asset = html.match(/(?:href|src)="(\/_next\/static\/[^"]+\.(?:css|js))"/)?.[1];
-    assert.ok(asset, 'missing asset in home HTML');
+    assert.ok(asset, 'missing asset in catalog HTML');
     const stylesOrScript = await get(origin, asset);
     assert.equal(stylesOrScript.status, 200, asset);
     assert.match(stylesOrScript.headers.get('content-type') ?? '',
@@ -107,5 +108,5 @@ assert.deepEqual(await catalog.json(), {
     stock: 5,
   }],
 });
-console.log('Release smoke passed: both homes and assets, health, readiness 200/503, fixture BFF.');
+console.log('Release smoke passed: localized catalogs and assets, health, readiness 200/503, fixture BFF.');
 JS

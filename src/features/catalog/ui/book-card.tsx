@@ -1,7 +1,7 @@
-import Image from 'next/image';
 import Link from 'next/link';
-import { cn } from '@/shared/lib/utils';
+import { ChevronRight } from 'lucide-react';
 import type { Book } from '../model';
+import { BookCover } from './book-cover';
 
 export function formatBookPrice(
   locale: string,
@@ -16,38 +16,6 @@ export function formatBookPrice(
   }).format(amount);
 }
 
-export function BookCover({
-  category,
-  detail = false,
-}: {
-  category: string;
-  detail?: boolean;
-}) {
-  return (
-    <div
-      className={cn(
-        'bg-accent grid place-items-center',
-        category === 'Programming' && 'bg-line/55',
-        detail
-          ? 'min-h-64 rounded-xl p-8 sm:min-h-80'
-          : 'aspect-[5/3] px-5 py-4',
-      )}
-    >
-      <Image
-        src="/books/placeholder.svg"
-        alt=""
-        width={176}
-        height={240}
-        unoptimized
-        className={cn(
-          'h-auto drop-shadow-md',
-          detail ? 'w-36 sm:w-44' : 'w-[35%] max-w-28',
-        )}
-      />
-    </div>
-  );
-}
-
 export function BookCard({
   book,
   href,
@@ -60,27 +28,34 @@ export function BookCard({
   stock: string;
 }) {
   return (
-    <article className="border-line bg-surface flex min-w-0 flex-col overflow-hidden rounded-lg border">
-      <BookCover category={book.category} />
-      <div className="flex grow flex-col p-4">
+    <article className="group border-line hover:border-input bg-surface relative flex min-w-0 flex-col rounded-xl border">
+      <BookCover book={book} />
+      <div className="flex grow flex-col p-3 sm:p-4">
         <p className="text-muted text-xs font-medium wrap-anywhere">
           {book.category}
         </p>
-        <h2 className="font-display mt-1.5 text-xl leading-snug wrap-anywhere">
+        <h2 className="mt-1.5 text-base leading-snug font-semibold wrap-anywhere">
           <Link
             href={href}
             prefetch={false}
-            className="hover:text-primary rounded-sm hover:underline"
+            className="group-hover:text-primary rounded-sm after:absolute after:inset-0 after:rounded-xl"
           >
             {book.title}
           </Link>
         </h2>
         <p className="text-muted mt-1 text-sm wrap-anywhere">{book.author}</p>
-        <div className="mt-auto flex flex-wrap items-end justify-between gap-1 pt-5 text-sm">
-          <p className="text-primary font-semibold">
-            {formatBookPrice(locale, book)}
-          </p>
-          <p className="text-muted">{stock}</p>
+        <div className="mt-auto flex items-end justify-between gap-1.5 pt-4">
+          <div className="min-w-0">
+            <p className="text-lg leading-tight font-bold tracking-tight tabular-nums">
+              {formatBookPrice(locale, book)}
+            </p>
+            <p className="text-muted mt-0.5 text-xs">{stock}</p>
+          </div>
+          <ChevronRight
+            className="text-primary hidden shrink-0 sm:block"
+            size={17}
+            aria-hidden
+          />
         </div>
       </div>
     </article>

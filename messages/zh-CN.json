@@ -1,37 +1,16 @@
 {
   "Shell": {
-    "title": "React 参考架构",
-    "description": "以在线书店目录为例的现代 React 应用架构参考实现。",
-    "brand": "参考书店",
+    "title": "页间书店",
+    "description": "浏览架构、编程与工程实践书籍。",
+    "brand": "页间书店",
     "nav": "主导航",
-    "home": "架构概览",
     "books": "书籍目录",
+    "cart": "购物车",
+    "orders": "订单",
     "theme": "切换深色主题",
-    "demo": "演示模式",
     "skip": "跳至内容",
     "notFound": "找不到这个页面",
-    "backHome": "返回首页"
-  },
-  "Home": {
-    "title": "现代 React 应用参考架构",
-    "description": "在线书店的只读目录展示了浏览器、Next.js 服务端、同源 API 和业务后端如何协作。",
-    "boundaries": "各层职责",
-    "browser": {
-      "title": "浏览器",
-      "description": "收集筛选输入，提交后用 URL 保存分类和页码。"
-    },
-    "renderer": {
-      "title": "Next.js 服务端",
-      "description": "读取 URL 查询条件和目录结果，在服务端生成书卡。"
-    },
-    "bff": {
-      "title": "BFF",
-      "description": "校验同源 HTTP 请求，使用与页面相同的目录读取器，并返回 JSON。"
-    },
-    "backend": {
-      "title": "业务后端",
-      "description": "真实模式下，Java Catalog 提供书名、价格和库存。"
-    }
+    "backToCatalog": "返回目录"
   },
   "Catalog": {
     "title": "书籍目录",
@@ -58,6 +37,56 @@
     "back": "返回目录",
     "stock": "库存 {count, number} 本",
     "soldOut": "暂时缺货",
-    "price": "价格"
+    "price": "价格",
+    "author": "作者 {name}",
+    "aboutBook": "内容简介"
+  },
+  "Checkout": {
+    "cart": "购物车",
+    "orders": "我的订单",
+    "add": "加入购物车",
+    "adding": "正在加购…",
+    "quantity": "数量",
+    "update": "更新数量",
+    "remove": "移除《{title}》",
+    "removeLabel": "移除",
+    "browse": "继续选书",
+    "emptyCart": "购物车还是空的。",
+    "emptyOrders": "还没有订单。",
+    "subtotal": "小计",
+    "summary": "订单摘要",
+    "itemCount": "共 {count, number} 本",
+    "unitPrice": "单价 {price}",
+    "total": "合计",
+    "placeOrder": "演示下单",
+    "quote": "核对报价",
+    "quoting": "正在获取报价…",
+    "confirmQuote": "确认报价",
+    "expiresAt": "报价有效至 {time}",
+    "backToCart": "返回购物车",
+    "placing": "正在下单…",
+    "placed": "下单成功。",
+    "orderedAt": "下单时间",
+    "placedStatus": "已下单",
+    "order": "订单 {id}",
+    "orderLine": "{quantity, number} × {price}",
+    "loading": "正在加载…",
+    "retry": "重试",
+    "notices": {
+      "invalid": "请选择有效的数量后重试。",
+      "missing": "这本书已下架。",
+      "stock": "库存有变化，请减少数量后重试。",
+      "limit": "购物车最多可放 20 种书。",
+      "changed": "购物车或价格有变化，请检查更新后的购物车再下单。",
+      "empty": "没有可按此币种结算的书籍。",
+      "total": "小计超出可结算范围，请减少数量后重试。",
+      "unavailable": "书店暂时无法访问，请稍后重试。",
+      "quoteMissing": "找不到这份报价，请重新核对购物车。",
+      "expired": "报价已过期，请重新获取报价。",
+      "consumed": "这份报价已提交，请查看订单记录。",
+      "conflict": "本次提交与已有记录冲突，请重新核对报价。",
+      "processing": "订单仍在处理。可再次提交同一报价查询结果。",
+      "reconcile": "订单结果待核对。可再次提交同一报价查询结果。"
+    }
   }
 }

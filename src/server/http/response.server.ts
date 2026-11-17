@@ -13,9 +13,11 @@ export function apiErrorResponse(
   return apiJson(body, failure.status);
 }
 
-export function apiJson(data: unknown, status = 200) {
+export function apiJson(data: unknown, status = 200, metadata?: HeadersInit) {
+  const headers = new Headers(metadata);
+  headers.set('Cache-Control', 'no-store');
   return Response.json(data, {
     status,
-    headers: { 'Cache-Control': 'no-store' },
+    headers,
   });
 }

@@ -4,6 +4,7 @@ import { demoBooks } from '../src/mocks/fixtures/catalog.ts';
 import {
   demoDatabasePath,
   demoDataDir,
+  demoSchemaVersion,
 } from '../src/server/adapters/demo/data-path.ts';
 
 const dir = demoDataDir.safeParse(process.env.DEMO_DATA_DIR);
@@ -17,18 +18,27 @@ try {
   db.exec('BEGIN IMMEDIATE');
   try {
     const version = db.prepare('PRAGMA user_version').get().user_version;
-    if (version === 0) {
+    const migrations = [
+      '001-catalog.sql',
+      '002-checkout.sql',
+      '003-checkout-resources.sql',
+    ];
+    if (
+      typeof version !== 'number' ||
+      version < 0 ||
+      version > demoSchemaVersion
+    )
+      throw new Error('Unknown demo database schema');
+    for (const file of migrations.slice(version)) {
       db.exec(
         readFileSync(
           new URL(
-            '../src/server/adapters/demo/migrations/001-catalog.sql',
+            '../src/server/adapters/demo/migrations/' + file,
             import.meta.url,
           ),
           'utf8',
         ),
       );
-    } else if (version !== 1) {
-      throw new Error('Unknown teaching database schema');
     }
     const insert = db.prepare(
       'INSERT INTO books (id, title, author, category, price_minor, currency, stock) ' +
@@ -54,4 +64,4 @@ try {
   db.close();
 }
 
-console.log('Teaching catalog seeded.');
+console.log('Demo bookstore seeded.');

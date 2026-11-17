@@ -51,7 +51,212 @@ paths:
         '503': { $ref: '#/components/responses/Error' }
         '504': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
+  /api/v1/cart:
+    get:
+      operationId: getCart
+      description: Demo profile only. The shopper is identified by the HttpOnly cookie.
+      responses:
+        '200':
+          description: Private cart with current stock, prices, and a revision per currency.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [groups]
+                properties:
+                  groups:
+                    type: array
+                    items: { $ref: '#/components/schemas/CartGroup' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/v1/cart/items/{bookId}:
+    parameters:
+      - name: bookId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getCartItem
+      responses:
+        '200':
+          description: Current cart item and its version.
+          headers:
+            ETag:
+              description: Strong resource validator used by conditional PUT and DELETE.
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CartItem' }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+    put:
+      operationId: putCartItem
+      description: Demo profile only. Sets the absolute quantity. An unchanged quantity leaves the cart revision unchanged.
+      parameters:
+        - name: If-Match
+          in: header
+          description: Set the quantity only if the item matches a current strong validator.
+          schema: { type: string }
+        - name: If-None-Match
+          in: header
+          description: Use an asterisk to create the item only if it does not exist.
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [quantity]
+              properties:
+                quantity: { $ref: '#/components/schemas/BookQuantity' }
+      responses:
+        '200': { $ref: '#/components/responses/CartItem' }
+        '201':
+          description: A new line was added to the cart.
+          headers:
+            Location: { $ref: '#/components/headers/ResourceLocation' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CartItem' }
+        '409': { $ref: '#/components/responses/Error' }
+        '412': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteCartItem
+      parameters:
+        - name: If-Match
+          in: header
+          description: Remove the item only if it matches a current strong validator.
+          schema: { type: string }
+        - name: If-None-Match
+          in: header
+          description: Remove the item only if it does not match a supplied validator.
+          schema: { type: string }
+      responses:
+        '204':
+          description: The line is absent from the current shopper's cart.
+        '412': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/v1/order-quotes:
+    post:
+      operationId: createOrderQuote
+      description: Freezes the current values for one currency of a demo cart for ten minutes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [currency, cartRevision]
+              properties:
+                currency: { $ref: '#/components/schemas/Currency' }
+                cartRevision: { $ref: '#/components/schemas/CartRevision' }
+      responses:
+        '201':
+          description: Created quote.
+          headers:
+            Location: { $ref: '#/components/headers/ResourceLocation' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderQuote' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/v1/order-quotes/{quoteId}:
+    get:
+      operationId: getOrderQuote
+      parameters:
+        - name: quoteId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The current shopper's frozen quote, including its expiration time.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/OrderQuote' }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/v1/order-submissions:
+    post:
+      operationId: submitOrder
+      description: Demo profile only. The order and submission are created in the same transaction. The same key and quote replay the existing submission.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [quoteId]
+              properties:
+                quoteId: { type: string, format: uuid }
+      responses:
+        '200': { $ref: '#/components/responses/Submission' }
+        '201': { $ref: '#/components/responses/Submission' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/v1/order-submissions/{submissionId}:
+    get:
+      operationId: getOrderSubmission
+      parameters:
+        - name: submissionId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: The current shopper's recorded submission.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PlacedSubmission' }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/v1/orders:
+    get:
+      operationId: listOrders
+      responses:
+        '200':
+          description: The current shopper's demo orders, most recent first.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [orders]
+                properties:
+                  orders:
+                    type: array
+                    items: { $ref: '#/components/schemas/Order' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/v1/orders/{orderId}:
+    get:
+      operationId: getOrder
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: An order and its stored line snapshots.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Order' }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
 components:
+  headers:
+    ResourceLocation:
+      description: Relative URL of the resource to read on the same origin.
+      schema: { type: string, format: uri-reference }
   parameters:
     Locale:
       name: Accept-Language
@@ -59,12 +264,109 @@ components:
       description: The first supported language is used. The default is zh-CN.
       schema: { type: string }
   responses:
+    CartItem:
+      description: The current quantity for the book in the shopper's cart.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/CartItem' }
+    Submission:
+      description: Newly placed or replayed submission.
+      headers:
+        Location: { $ref: '#/components/headers/ResourceLocation' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/PlacedSubmission' }
     Error:
       description: Safe application error.
       content:
         application/json:
           schema: { $ref: '#/components/schemas/ApiError' }
   schemas:
+    Currency:
+      type: string
+      enum: [CNY, USD]
+    MoneyMinor:
+      type: integer
+      minimum: 0
+      maximum: 9007199254740991
+    BookQuantity:
+      type: integer
+      minimum: 1
+      maximum: 99
+    CartRevision:
+      type: string
+      pattern: '^[a-f0-9]{64}$'
+    CartItem:
+      type: object
+      required: [bookId, quantity]
+      properties:
+        bookId: { type: string, format: uuid }
+        quantity: { $ref: '#/components/schemas/BookQuantity' }
+    CartGroup:
+      type: object
+      required: [currency, revision, totalMinor, lines]
+      properties:
+        currency: { $ref: '#/components/schemas/Currency' }
+        revision: { $ref: '#/components/schemas/CartRevision' }
+        totalMinor:
+          anyOf:
+            - $ref: '#/components/schemas/MoneyMinor'
+            - type: 'null'
+        lines:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/OrderLine'
+              - type: object
+                required: [stock, etag]
+                properties:
+                  stock: { type: integer, minimum: 0 }
+                  etag:
+                    {
+                      type: string,
+                      description: Strong validator for this cart item.,
+                    }
+    OrderLine:
+      type: object
+      required: [bookId, title, priceMinor, quantity]
+      properties:
+        bookId: { type: string, format: uuid }
+        title: { type: string }
+        priceMinor: { $ref: '#/components/schemas/MoneyMinor' }
+        quantity: { $ref: '#/components/schemas/BookQuantity' }
+    OrderQuote:
+      type: object
+      required: [quoteId, expiresAt, currency, totalMinor, lines]
+      properties:
+        quoteId: { type: string, format: uuid }
+        expiresAt: { type: string, format: date-time }
+        currency: { $ref: '#/components/schemas/Currency' }
+        totalMinor: { $ref: '#/components/schemas/MoneyMinor' }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/OrderLine' }
+    PlacedSubmission:
+      type: object
+      required: [submissionId, state, order]
+      properties:
+        submissionId: { type: string, format: uuid }
+        state: { type: string, const: PLACED }
+        order:
+          type: object
+          required: [orderId]
+          properties:
+            orderId: { type: string, format: uuid }
+    Order:
+      type: object
+      required: [id, currency, totalMinor, createdAt, lines]
+      properties:
+        id: { type: string, format: uuid }
+        currency: { $ref: '#/components/schemas/Currency' }
+        totalMinor: { $ref: '#/components/schemas/MoneyMinor' }
+        createdAt: { type: string, format: date-time }
+        lines:
+          type: array
+          items: { $ref: '#/components/schemas/OrderLine' }
     Book:
       type: object
       additionalProperties: false
@@ -104,6 +406,16 @@ components:
                 - INVALID_INPUT
                 - FORBIDDEN
                 - BOOK_NOT_FOUND
+                - RESOURCE_NOT_FOUND
+                - CART_EMPTY
+                - CART_CHANGED
+                - CART_LIMIT
+                - INSUFFICIENT_STOCK
+                - AMOUNT_OUT_OF_RANGE
+                - QUOTE_EXPIRED
+                - QUOTE_CONSUMED
+                - IDEMPOTENCY_CONFLICT
+                - CART_ITEM_PRECONDITION_FAILED
                 - PAYLOAD_TOO_LARGE
                 - UNSUPPORTED_MEDIA_TYPE
                 - UNSUPPORTED_FILTER

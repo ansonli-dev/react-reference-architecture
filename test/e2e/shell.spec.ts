@@ -9,11 +9,17 @@ test('uses explicit locales and leaves health and assets outside locale routing'
     headers: { 'Accept-Language': 'en', Cookie: 'NEXT_LOCALE=en' },
   });
   expect(root.status()).toBe(307);
-  expect(root.headers().location).toMatch(/\/zh-CN$/);
+  expect(root.headers().location).toMatch(/\/zh-CN\/books$/);
 
   await page.goto('/en');
+  await expect(page).toHaveURL('/en/books');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
-  await expect(page).toHaveTitle(/React Reference Architecture/);
+  await expect(page).toHaveTitle('Book catalog');
+  await expect(
+    page.getByRole('link', { name: 'Home', exact: true }),
+  ).toHaveCount(0);
+  await page.goto('/en/books?category=Architecture&variant=B');
+  await expect(page).toHaveURL('/en/books?category=Architecture');
   const missing = await request.get('/fr/books', { maxRedirects: 0 });
   expect(missing.status()).toBe(404);
   expect((await request.get('/fr', { maxRedirects: 0 })).status()).toBe(404);
@@ -34,14 +40,20 @@ test('uses explicit locales and leaves health and assets outside locale routing'
 
 test('the language and theme controls work from the keyboard', async ({
   page,
-}) => {
-  await page.goto('/zh-CN?from=guide');
+}, info) => {
+  await page.goto('/zh-CN/books?category=Architecture');
   const language = page.getByRole('link', { name: 'English' });
   const theme = page.getByRole('button', { name: '切换深色主题' });
+  await expect(language).toHaveAttribute(
+    'href',
+    '/en/books?category=Architecture',
+  );
 
   await page
     .getByRole('banner')
-    .getByRole('link', { name: '书籍目录' })
+    .getByRole('link', {
+      name: info.project.name === 'release' ? '书籍目录' : '订单',
+    })
     .focus();
   await page.keyboard.press('Tab');
   await expect(language).toBeFocused();
@@ -53,7 +65,7 @@ test('the language and theme controls work from the keyboard', async ({
 
   await page.keyboard.press('Shift+Tab');
   await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/en\?from=guide$/);
+  await expect(page).toHaveURL('/en/books?category=Architecture');
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(
     page.getByRole('button', { name: 'Toggle dark theme' }),
@@ -64,9 +76,9 @@ test('supported locales return localized HTTP 404 pages for unknown paths', asyn
   page,
 }) => {
   const cases = [
-    ['zh-CN', '/does-not-exist', '找不到这个页面', '返回首页'],
-    ['en', '/does-not-exist', 'Page not found', 'Back to home'],
-    ['en', '/does-not-exist/nested', 'Page not found', 'Back to home'],
+    ['zh-CN', '/does-not-exist', '找不到这个页面', '返回目录'],
+    ['en', '/does-not-exist', 'Page not found', 'Back to books'],
+    ['en', '/does-not-exist/nested', 'Page not found', 'Back to books'],
   ];
   for (const [locale, path, heading, home] of cases) {
     const response = await page.goto('/' + locale + path);
@@ -75,7 +87,7 @@ test('supported locales return localized HTTP 404 pages for unknown paths', asyn
     await expect(page.getByRole('heading', { name: heading })).toBeVisible();
     await expect(page.getByRole('link', { name: home })).toHaveAttribute(
       'href',
-      '/' + locale,
+      '/' + locale + '/books',
     );
   }
 });

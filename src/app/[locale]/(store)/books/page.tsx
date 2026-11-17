@@ -38,7 +38,7 @@ export default async function BooksPage({ params, searchParams }: BooksProps) {
 
   return (
     <>
-      <h1 className="font-display mb-8 text-4xl leading-tight sm:text-6xl">
+      <h1 className="mb-6 text-3xl leading-tight font-bold tracking-tight sm:text-4xl">
         {t('title')}
       </h1>
       <Suspense
@@ -127,24 +127,31 @@ async function CatalogContent({
           apply: t('apply'),
         }}
       />
-      <p
-        role="status"
-        aria-atomic="true"
-        className={
-          data.books.length
-            ? 'text-muted mt-5 text-sm'
-            : 'border-line bg-surface mt-7 rounded-lg border p-5'
-        }
-      >
-        {data.books.length
-          ? t('results', { count: data.books.length })
-          : t('empty')}
-        {query.category &&
-          ' ' + t('resultsCategory', { category: query.category })}
-        {query.q && ' ' + t('resultsQuery', { q: query.q })}
-      </p>
+      <div className="mt-4 flex min-h-11 flex-wrap items-center justify-between gap-x-4">
+        <p
+          role="status"
+          aria-atomic="true"
+          className="text-muted text-sm wrap-anywhere"
+        >
+          {data.books.length
+            ? t('results', { count: data.books.length })
+            : t('empty')}
+          {query.category &&
+            ' ' + t('resultsCategory', { category: query.category })}
+          {query.q && ' ' + t('resultsQuery', { q: query.q })}
+        </p>
+        {(query.category || query.q) && (
+          <Link
+            className="text-primary inline-flex min-h-11 items-center rounded-sm text-sm hover:underline"
+            href={base}
+            prefetch={false}
+          >
+            {t('reset')}
+          </Link>
+        )}
+      </div>
       {data.books.length > 0 && (
-        <div className="mt-3 grid gap-4 min-[490px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+        <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
           {data.books.map((book) => (
             <BookCard
               key={book.id}
@@ -166,7 +173,7 @@ async function CatalogContent({
           {data.page > 1 && (
             <Link
               prefetch={false}
-              className="text-primary hover:bg-accent flex items-center gap-1 rounded-md px-2 py-2"
+              className="text-primary hover:bg-accent flex min-h-11 items-center gap-1 rounded-md px-3"
               href={catalogHref(base, { ...query, page: data.page - 1 })}
             >
               <ChevronLeft size={16} aria-hidden />
@@ -179,7 +186,7 @@ async function CatalogContent({
           {data.hasNext && (
             <Link
               prefetch={false}
-              className="text-primary hover:bg-accent flex items-center gap-1 rounded-md px-2 py-2"
+              className="text-primary hover:bg-accent flex min-h-11 items-center gap-1 rounded-md px-3"
               href={catalogHref(base, { ...query, page: data.page + 1 })}
             >
               {t('next')}

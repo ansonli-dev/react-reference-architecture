@@ -33,10 +33,199 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/cart": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Demo profile only. The shopper is identified by the HttpOnly cookie. */
+        get: operations["getCart"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cart/items/{bookId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        get: operations["getCartItem"];
+        /** @description Demo profile only. Sets the absolute quantity. An unchanged quantity leaves the cart revision unchanged. */
+        put: operations["putCartItem"];
+        post?: never;
+        delete: operations["deleteCartItem"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/order-quotes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Freezes the current values for one currency of a demo cart for ten minutes. */
+        post: operations["createOrderQuote"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/order-quotes/{quoteId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getOrderQuote"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/order-submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Demo profile only. The order and submission are created in the same transaction. The same key and quote replay the existing submission. */
+        post: operations["submitOrder"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/order-submissions/{submissionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getOrderSubmission"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listOrders"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/orders/{orderId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["getOrder"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** @enum {string} */
+        Currency: "CNY" | "USD";
+        MoneyMinor: number;
+        BookQuantity: number;
+        CartRevision: string;
+        CartItem: {
+            /** Format: uuid */
+            bookId: string;
+            quantity: components["schemas"]["BookQuantity"];
+        };
+        CartGroup: {
+            currency: components["schemas"]["Currency"];
+            revision: components["schemas"]["CartRevision"];
+            totalMinor: components["schemas"]["MoneyMinor"] | null;
+            lines: (components["schemas"]["OrderLine"] & {
+                stock: number;
+                /** @description Strong validator for this cart item. */
+                etag: string;
+            })[];
+        };
+        OrderLine: {
+            /** Format: uuid */
+            bookId: string;
+            title: string;
+            priceMinor: components["schemas"]["MoneyMinor"];
+            quantity: components["schemas"]["BookQuantity"];
+        };
+        OrderQuote: {
+            /** Format: uuid */
+            quoteId: string;
+            /** Format: date-time */
+            expiresAt: string;
+            currency: components["schemas"]["Currency"];
+            totalMinor: components["schemas"]["MoneyMinor"];
+            lines: components["schemas"]["OrderLine"][];
+        };
+        PlacedSubmission: {
+            /** Format: uuid */
+            submissionId: string;
+            /** @constant */
+            state: "PLACED";
+            order: {
+                /** Format: uuid */
+                orderId: string;
+            };
+        };
+        Order: {
+            /** Format: uuid */
+            id: string;
+            currency: components["schemas"]["Currency"];
+            totalMinor: components["schemas"]["MoneyMinor"];
+            /** Format: date-time */
+            createdAt: string;
+            lines: components["schemas"]["OrderLine"][];
+        };
         Book: {
             /** Format: uuid */
             id: string;
@@ -56,7 +245,7 @@ export interface components {
         ApiError: {
             error: {
                 /** @enum {string} */
-                code: "INVALID_INPUT" | "FORBIDDEN" | "BOOK_NOT_FOUND" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "UNSUPPORTED_FILTER" | "INTERNAL_ERROR" | "UPSTREAM_FAILURE" | "CATALOG_UNAVAILABLE" | "UPSTREAM_TIMEOUT";
+                code: "INVALID_INPUT" | "FORBIDDEN" | "BOOK_NOT_FOUND" | "RESOURCE_NOT_FOUND" | "CART_EMPTY" | "CART_CHANGED" | "CART_LIMIT" | "INSUFFICIENT_STOCK" | "AMOUNT_OUT_OF_RANGE" | "QUOTE_EXPIRED" | "QUOTE_CONSUMED" | "IDEMPOTENCY_CONFLICT" | "CART_ITEM_PRECONDITION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "UNSUPPORTED_FILTER" | "INTERNAL_ERROR" | "UPSTREAM_FAILURE" | "CATALOG_UNAVAILABLE" | "UPSTREAM_TIMEOUT";
                 /** Format: uuid */
                 requestId: string;
                 fields?: {
@@ -66,6 +255,25 @@ export interface components {
         };
     };
     responses: {
+        /** @description The current quantity for the book in the shopper's cart. */
+        CartItem: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["CartItem"];
+            };
+        };
+        /** @description Newly placed or replayed submission. */
+        Submission: {
+            headers: {
+                Location: components["headers"]["ResourceLocation"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["PlacedSubmission"];
+            };
+        };
         /** @description Safe application error. */
         Error: {
             headers: {
@@ -81,7 +289,10 @@ export interface components {
         Locale: string;
     };
     requestBodies: never;
-    headers: never;
+    headers: {
+        /** @description Relative URL of the resource to read on the same origin. */
+        ResourceLocation: string;
+    };
     pathItems: never;
 }
 export type $defs = Record<string, never>;
@@ -148,6 +359,270 @@ export interface operations {
             502: components["responses"]["Error"];
             503: components["responses"]["Error"];
             504: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getCart: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Private cart with current stock, prices, and a revision per currency. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        groups: components["schemas"]["CartGroup"][];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getCartItem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current cart item and its version. */
+            200: {
+                headers: {
+                    /** @description Strong resource validator used by conditional PUT and DELETE. */
+                    ETag?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartItem"];
+                };
+            };
+            404: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    putCartItem: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Set the quantity only if the item matches a current strong validator. */
+                "If-Match"?: string;
+                /** @description Use an asterisk to create the item only if it does not exist. */
+                "If-None-Match"?: string;
+            };
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    quantity: components["schemas"]["BookQuantity"];
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["CartItem"];
+            /** @description A new line was added to the cart. */
+            201: {
+                headers: {
+                    Location: components["headers"]["ResourceLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CartItem"];
+                };
+            };
+            409: components["responses"]["Error"];
+            412: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    deleteCartItem: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Remove the item only if it matches a current strong validator. */
+                "If-Match"?: string;
+                /** @description Remove the item only if it does not match a supplied validator. */
+                "If-None-Match"?: string;
+            };
+            path: {
+                bookId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The line is absent from the current shopper's cart. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            412: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    createOrderQuote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    currency: components["schemas"]["Currency"];
+                    cartRevision: components["schemas"]["CartRevision"];
+                };
+            };
+        };
+        responses: {
+            /** @description Created quote. */
+            201: {
+                headers: {
+                    Location: components["headers"]["ResourceLocation"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderQuote"];
+                };
+            };
+            409: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getOrderQuote: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                quoteId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The current shopper's frozen quote, including its expiration time. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderQuote"];
+                };
+            };
+            404: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    submitOrder: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uuid */
+                    quoteId: string;
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Submission"];
+            201: components["responses"]["Submission"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getOrderSubmission: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                submissionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The current shopper's recorded submission. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlacedSubmission"];
+                };
+            };
+            404: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listOrders: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The current shopper's demo orders, most recent first. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        orders: components["schemas"]["Order"][];
+                    };
+                };
+            };
+            default: components["responses"]["Error"];
+        };
+    };
+    getOrder: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description An order and its stored line snapshots. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Order"];
+                };
+            };
+            404: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };
