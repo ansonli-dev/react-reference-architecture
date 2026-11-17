@@ -6,7 +6,7 @@
 
 ## 当前状态
 
-已初始化 Next.js App Router、React Compiler、TypeScript strict、Tailwind、工程首页、健康检查和 CI。在线书店、认证、国际化及真实后端集成按建设指导书逐步实现；当前首页不依赖后端。
+已完成 App Router 基线与双语外壳。工程首页、主题切换、健康检查和就绪检查可本地启动。目录页在下一批接入。
 
 ## 本地运行
 
@@ -20,7 +20,7 @@ pnpm dev
 
 如果环境未提供 Corepack，请先按 [pnpm 官方安装指引](https://pnpm.io/installation) 安装 package.json 指定版本的 pnpm。
 
-访问 http://localhost:3000。健康检查：`GET /api/health`。
+访问 [本地首页](http://127.0.0.1:3000/zh-CN)。`GET /api/health` 是进程健康检查，`GET /api/ready` 是目录依赖检查。
 
 ```bash
 pnpm check   # 类型、ESLint、格式和模块依赖
@@ -28,7 +28,18 @@ pnpm build
 pnpm start   # 启动生产构建
 ```
 
-当前不需要环境变量。后端接入后再提供独立 Mock/真实模式；目前不要将工程首页视作业务 Mock。
+教学版用 `pnpm dev:mock` 开发，用 `pnpm build:demo` 和 `pnpm start:demo` 构建和启动。发布版用 `pnpm dev:real` 开发，用 `pnpm build` 构建并用 `pnpm start` 启动。通过 `PORT` 指定端口。构建过程无需配置目录数据源，并且两种构建应串行运行。
+
+```bash
+pnpm exec playwright install chromium --only-shell
+pnpm api:check
+pnpm test
+pnpm build
+pnpm build:demo
+pnpm test:e2e
+```
+
+Playwright 测试启动两个生产产物。仅调试开发外壳时可用 `BOOKSTORE_E2E_DEV=1 pnpm test:e2e shell.spec.ts`。
 
 ## 文档
 
@@ -49,4 +60,4 @@ pnpm start   # 启动生产构建
 
 ## 当前限制
 
-shadcn/ui 初始化在当前执行环境被网络拒绝，尚未接入。Query、Zustand、表单、国际化、认证、Mock 与业务测试按后续阶段实现；本次只交付可运行的工程基线。
+教学登录、交易与真实 Java 集成位于后续阶段。
