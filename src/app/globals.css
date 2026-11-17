@@ -1,19 +1,54 @@
 @import 'tailwindcss';
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  color-scheme: light;
+  --bookstore-bg: #f5f7f3;
+  --bookstore-surface: #fff;
+  --bookstore-ink: #142d30;
+  --bookstore-muted: #496367;
+  --bookstore-primary: #205658;
+  --bookstore-primary-ink: #fff;
+  --bookstore-accent: #deebe4;
+  --bookstore-line: #cbdad3;
+  --bookstore-input: #76918a;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bookstore-bg: #112224;
+  --bookstore-surface: #1b3032;
+  --bookstore-ink: #e9f3ed;
+  --bookstore-muted: #b3cdcb;
+  --bookstore-primary: #b2e3d5;
+  --bookstore-primary-ink: #143532;
+  --bookstore-accent: #284541;
+  --bookstore-line: #3b5555;
+  --bookstore-input: #72958f;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bookstore-bg);
+  --color-surface: var(--bookstore-surface);
+  --color-foreground: var(--bookstore-ink);
+  --color-muted: var(--bookstore-muted);
+  --color-primary: var(--bookstore-primary);
+  --color-primary-foreground: var(--bookstore-primary-ink);
+  --color-accent: var(--bookstore-accent);
+  --color-line: var(--bookstore-line);
+  --color-input: var(--bookstore-input);
+  --color-ring: var(--bookstore-primary);
   --font-sans:
     system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-display: Georgia, 'Songti SC', 'Noto Serif CJK SC', serif;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--bookstore-bg);
+  color: var(--bookstore-ink);
   font-family: var(--font-sans);
+}
+
+a:focus-visible {
+  outline: 2px solid var(--bookstore-primary);
+  outline-offset: 3px;
 }

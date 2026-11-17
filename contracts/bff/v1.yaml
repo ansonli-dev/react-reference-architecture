@@ -1,0 +1,119 @@
+openapi: 3.1.0
+info:
+  title: Reference Books BFF
+  version: 1.0.0
+paths:
+  /api/v1/catalog/books:
+    get:
+      operationId: listBooks
+      parameters:
+        - $ref: '#/components/parameters/Locale'
+        - name: category
+          in: query
+          schema: { type: string, minLength: 1, maxLength: 80 }
+        - name: q
+          in: query
+          description: Keyword search is supported in teaching mode.
+          schema: { type: string, minLength: 1, maxLength: 64 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 1 }
+      responses:
+        '200':
+          description: One page of public books.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/BookPage' }
+        '400': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        '504': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/v1/catalog/books/{bookId}:
+    get:
+      operationId: getBook
+      parameters:
+        - $ref: '#/components/parameters/Locale'
+        - name: bookId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Public book.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Book' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '502': { $ref: '#/components/responses/Error' }
+        '503': { $ref: '#/components/responses/Error' }
+        '504': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+components:
+  parameters:
+    Locale:
+      name: Accept-Language
+      in: header
+      description: The first supported language is used. The default is zh-CN.
+      schema: { type: string }
+  responses:
+    Error:
+      description: Safe application error.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ApiError' }
+  schemas:
+    Book:
+      type: object
+      additionalProperties: false
+      required: [id, title, author, category, priceMinor, currency, stock]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        author: { type: string }
+        category: { type: string }
+        priceMinor: { type: integer, minimum: 0, maximum: 9007199254740991 }
+        currency: { type: string, enum: [CNY, USD] }
+        stock: { type: integer, minimum: 0 }
+    BookPage:
+      type: object
+      additionalProperties: false
+      required: [books, page, hasNext]
+      properties:
+        books:
+          type: array
+          maxItems: 12
+          items: { $ref: '#/components/schemas/Book' }
+        page: { type: integer, minimum: 1, maximum: 100 }
+        hasNext: { type: boolean }
+    ApiError:
+      type: object
+      additionalProperties: false
+      required: [error]
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          required: [code, requestId]
+          properties:
+            code:
+              type: string
+              enum:
+                - INVALID_INPUT
+                - FORBIDDEN
+                - BOOK_NOT_FOUND
+                - PAYLOAD_TOO_LARGE
+                - UNSUPPORTED_MEDIA_TYPE
+                - UNSUPPORTED_FILTER
+                - INTERNAL_ERROR
+                - UPSTREAM_FAILURE
+                - CATALOG_UNAVAILABLE
+                - UPSTREAM_TIMEOUT
+            requestId: { type: string, format: uuid }
+            fields:
+              type: object
+              additionalProperties:
+                type: string
+                enum: [INVALID_VALUE]

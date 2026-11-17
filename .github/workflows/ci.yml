@@ -7,6 +7,8 @@ permissions:
 jobs:
   checks:
     runs-on: ubuntu-latest
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -15,5 +17,25 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm peers check
+      - name: Check generated OpenAPI types
+        run: |
+          pnpm api:generate
+          git diff --exit-code -- src/shared/api/generated src/server/adapters/java/generated
+          generated_changes="$(git status --porcelain --untracked-files=all -- src/shared/api/generated src/server/adapters/java/generated)"
+          if [ -n "$generated_changes" ]; then
+            printf '%s\n' "$generated_changes"
+            exit 1
+          fi
       - run: pnpm check
+      - run: pnpm test
       - run: pnpm build
+      - run: pnpm build:demo
+      - run: pnpm exec playwright install --with-deps chromium --only-shell
+      - run: pnpm test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-test-results
+          path: test-results/
+          if-no-files-found: ignore
