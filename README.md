@@ -131,4 +131,5 @@ flowchart TD
 | [前端架构概览](docs/architecture/overview.md)          | 浏览器与 Next.js 的职责、RSC 和 HTTP 入口、状态所有权。 |
 | [前端架构规范](docs/architecture/architecture-spec.md) | 目录布局、公开入口、依赖方向、错误响应和 UI 约定。      |
 | [架构决策记录](docs/adr/README.md)                     | App Router 工程基线与公开读取缓存的背景和取舍。         |
+| [前端测试体系](docs/testing-strategy/README.md)        | 测试层级、测试类型、用例示例和运行入口。                |
 | [文档索引](docs/README.md)                             | 仓库内架构文档入口。                                    |

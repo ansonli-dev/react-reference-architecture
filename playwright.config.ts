@@ -22,6 +22,7 @@ const servers = [
 
 export default defineConfig({
   testDir: './test/e2e',
+  outputDir: 'test-results/e2e',
   workers: 1,
   use: { trace: 'retain-on-failure' },
   projects: targets.map(({ name, port }) => ({

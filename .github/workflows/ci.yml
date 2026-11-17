@@ -37,7 +37,7 @@ jobs:
         if: failure()
         with:
           name: playwright-test-results
-          path: test-results/
+          path: test-results/e2e/
           if-no-files-found: ignore
   visual:
     runs-on: ubuntu-24.04-arm
