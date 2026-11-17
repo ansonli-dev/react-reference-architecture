@@ -49,18 +49,18 @@ export default async function LocaleLayout({
             </Link>
             <nav
               aria-label={t('nav')}
-              className="flex flex-wrap items-center gap-2 sm:gap-4"
+              className="flex w-full flex-wrap items-center justify-between gap-y-1 min-[360px]:gap-x-1 sm:w-auto sm:gap-4"
             >
               <Link
                 href={'/' + locale}
-                className="text-muted hover:bg-accent rounded-md px-2 py-2 text-sm"
+                className="text-muted hover:bg-accent rounded-md px-1.5 py-2 text-sm max-[359px]:text-xs sm:px-2"
               >
                 {t('home')}
               </Link>
               <Link
                 href={'/' + locale + '/books'}
                 prefetch={false}
-                className="hover:bg-accent rounded-md px-2 py-2 text-sm font-semibold"
+                className="hover:bg-accent rounded-md px-1.5 py-2 text-sm font-semibold max-[359px]:text-xs sm:px-2"
               >
                 {t('books')}
               </Link>

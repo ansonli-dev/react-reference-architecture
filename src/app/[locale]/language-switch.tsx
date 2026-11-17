@@ -17,7 +17,7 @@ export function LanguageLink({
       hrefLang={target}
       lang={target}
       prefetch={false}
-      className="hover:bg-accent rounded-md px-2 py-2 text-sm font-medium"
+      className="hover:bg-accent rounded-md px-1.5 py-2 text-sm font-medium max-[359px]:text-xs sm:px-2"
     >
       {target === 'en' ? 'English' : '简体中文'}
     </Link>
