@@ -24,3 +24,12 @@
 - [目录 HTTP 测试](https://github.com/ansonli-dev/explicit-architecture/blob/14e511a8f361616e166f23daf5184012d501c656/catalog/src/test/java/com/example/catalog/interfaces/rest/BookQueryControllerTest.java) 和 [订单端到端测试目录](https://github.com/ansonli-dev/explicit-architecture/tree/14e511a8f361616e166f23daf5184012d501c656/e2e/src/test/java/com/example/e2e) 提供后续核验入口。
 
 真实目录验收需记录 Java commit、运行配置、seed 来源、OpenAPI 差异、实际请求/状态与脱敏样例、前端适配器和页面通过证据。Java 环境不可用时，保留源码确认状态并在发布记录列明阻塞。本地 HTTP stub 证据单列。私有能力的新增端点与验收方式见[Java 教学集成设计](../superpowers/specs/2026-11-17-java-demo-integration-design.md)。上表只描述基线版本。
+
+## A1 目录源码复核
+
+在固定 SHA `14e511a8f361616e166f23daf5184012d501c656` 上复核控制器、两个响应 record 与 JPA 查询。列表和详情都有相同的 7 个字段。两个 record 的 `priceCents` 为 Java `long`，`stock` 为 `int`。列表从第 0 页开始，`category` 使用精确匹配，查询没有排序子句。前端 v1 兼容范围为公开只读列表与详情，分类可选值由前端部署配置提供。
+
+证据状态为源码确认，真实 Java HTTP 待验。
+
+- [BookSummaryResponse](https://github.com/ansonli-dev/explicit-architecture/blob/14e511a8f361616e166f23daf5184012d501c656/catalog/src/main/java/com/example/catalog/interfaces/rest/response/BookSummaryResponse.java)
+- [BookDetailResponse](https://github.com/ansonli-dev/explicit-architecture/blob/14e511a8f361616e166f23daf5184012d501c656/catalog/src/main/java/com/example/catalog/interfaces/rest/response/BookDetailResponse.java)
