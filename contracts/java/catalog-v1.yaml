@@ -1,10 +1,8 @@
 openapi: 3.1.0
 info:
-  title: Java catalog v1 read-only subset
+  title: Read-only catalog contract
   version: 1.0.0
-  description: Read-only subset of the public Java v1 Catalog API.
-externalDocs:
-  url: https://github.com/ansonli-dev/explicit-architecture/tree/14e511a8f361616e166f23daf5184012d501c656/catalog
+  description: Operations used by this project's catalog HTTP adapter.
 paths:
   /api/v1/books:
     get:

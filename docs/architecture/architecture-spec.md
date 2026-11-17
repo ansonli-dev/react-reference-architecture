@@ -38,6 +38,12 @@
 - BFF 的 OpenAPI 定义客户端可用的 HTTP 接口与响应形状。生成类型用于静态检查，运行时输入由服务端校验。`pnpm api:check` 核对契约和生成类型的一致性。[BFF 契约](../../contracts/bff/v1.yaml)
 - HTTP 入口以 `{ error: { code, requestId } }` 表示失败，页面按语言呈现缺失、输入无效或重试提示。未知书籍在 BFF 返回 `404 BOOK_NOT_FOUND`，页面由 `notFound()` 选择缺失视图。流式页面已发送响应头时，页面请求仍可能是 HTTP 200。[错误码](../../src/shared/api/error.ts) · [HTTP 响应](../../src/server/http/response.server.ts) · [详情缺失页](<../../src/app/%5Blocale%5D/(store)/books/%5BbookId%5D/not-found.tsx>)
 
+### 本地购书接口
+
+演示的 BFF 用 `GET /api/v1/cart`、`PUT /api/v1/cart/items/{bookId}` 和 `DELETE /api/v1/cart/items/{bookId}` 管理购物车。加购先读取条目，再用 `If-Match` 设置下一数量，首次创建使用 `If-None-Match: *`。同一浏览器的标签页依次加购，以便共用首次加购建立的会话。购物车按页面读取到的条目版本更新和删除，版本变化时返回 `412`，页面提示核对最新数量。页面用 `POST /api/v1/order-quotes` 创建报价，客户端可读取 `Location` 指向的快照。确认页从 URL 恢复同一个报价。演示前端以报价 ID 作为稳定的幂等键。
+
+SQLite 在同一事务内创建下单提交、订单和明细，扣减库存并清理该币种的购物车。首次提交同步完成并返回 `201`，重放返回 `200`。响应提供下单提交的 `Location`。订单集合和单笔订单可通过 `GET /api/v1/orders` 与 `GET /api/v1/orders/{orderId}` 读取。[BFF OpenAPI 契约](../../contracts/bff/v1.yaml)
+
 ## 国际化、主题与可访问性
 
 - 页面使用 URL 的 locale 选择翻译，词典以相同的命名空间和键组织。共享控件通过属性接收文案。语言切换保留路由后缀和查询条件。[语言切换](../../src/app/%5Blocale%5D/language-switch.tsx)
@@ -48,7 +54,7 @@
 
 `pnpm check` 包含类型、Lint、格式和架构检查。架构测试覆盖跨 feature 导入、绕过公开入口和客户端间接引入服务端模块等反例。生产构建与页面 E2E 覆盖一次导航中服务端 HTML、客户端筛选、语言切换和缺失页反馈。[架构约束测试](../../test/unit/architecture.test.ts) · [目录页面 E2E](../../test/e2e/catalog-journey.spec.ts)
 
-新增功能时，先在 `src/features/<feature>/model.ts` 放置模型和校验，按实际使用需求设立 `client.ts`、`server.ts` 入口，再从 `src/app/` 或 `src/server/` 组合。修改 HTTP 契约时，从 [BFF 定义](../../contracts/bff/v1.yaml) 或 [Java v1 快照](../../contracts/java/catalog-v1.yaml) 更新，运行 `pnpm api:generate` 并一起提交 [BFF 类型](../../src/shared/api/generated/) 或 [Java 类型](../../src/server/adapters/java/generated/)。用模型单测验证输入规则、适配器集成测试验证上游映射、生产 HTTP 或浏览器用例验证公开行为。切换运行环境或改变依赖边界时记录 ADR。
+新增功能时，先在 `src/features/<feature>/model.ts` 放置模型和校验，按实际使用需求设立 `client.ts`、`server.ts` 入口，再从 `src/app/` 或 `src/server/` 组合。修改 BFF 契约时，更新 [OpenAPI 定义](../../contracts/bff/v1.yaml)，运行 `pnpm api:generate` 并一起提交 [生成类型](../../src/shared/api/generated/)。用模型单测验证输入规则、适配器集成测试验证数据映射、生产 HTTP 或浏览器用例验证公开行为。切换运行环境或改变依赖边界时记录 ADR。
 
 ### 可视化回归
 

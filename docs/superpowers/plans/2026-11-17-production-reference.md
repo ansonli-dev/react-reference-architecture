@@ -4,18 +4,18 @@
 
 **Goal:** 完成只读目录、架构约束、可复跑文档和参考发布路径，分层验收后通过 PR 合并到 main。
 
-**Architecture:** App Router 组合页面和同源 HTTP，公开目录读取器复用业务校验与缓存。Java 和 SQLite 通过 CatalogPort 装配，由各自的适配器兑现相同的目录查询语义。
+**Architecture:** App Router 组合页面和同源 HTTP，公开目录读取器复用业务校验与缓存。演示和发布模式各自通过 `CatalogPort` 装配目录适配器。
 
-**Tech Stack:** Next.js App Router、React 19、TypeScript strict、Node 24、pnpm 11.25.0、Vitest、Playwright、Linux OCI、Java v1。
+**Tech Stack:** Next.js App Router、React 19、TypeScript strict、Node 24、pnpm 11.25.0、Vitest、Playwright、Linux OCI。
 
 **Spec:** [前端架构参考实现完善设计](../specs/2026-11-17-production-reference-design.md)
 
 ## 全局约束
 
 - 中英文首页的架构正文随预渲染外壳返回，公共语言切换和主题控件可增强。文案提供介绍和业务状态反馈。只读目录为唯一完整业务范围。
-- 维持已锁定的技术栈、现有 BFF 响应形状、双构建档位和公开缓存的数据键。发布只对接 Java v1，演示使用 SQLite。
+- 维持已锁定的技术栈、现有 BFF 响应形状、双构建档位和公开缓存的数据键。演示使用 SQLite。
 - 版本化发布验证留在隔离环境。提交前遵守 AGENTS.md，运行 `pnpm check` 和 `pnpm build`。各任务做定向验证并累积变更，任务 6 整体校验后提交发布基线，任务 7 再提交 CI 描述和实现。最终从无差异的已提交版本验收，结果进入 PR，避免写回被验收的提交。
-- Node 生产构建如受宿主端口限制，使用仓库视觉脚本指定的 Playwright Linux ARM64 镜像、Node 24.15.0 和锁定的 pnpm。真实 Java 有已验证的 Docker Desktop 网关路径，见任务 7。
+- Node 生产构建如受宿主端口限制，使用仓库视觉脚本指定的 Playwright Linux ARM64 镜像、Node 24.15.0 和锁定的 pnpm。
 
 ## 优先反例
 
@@ -33,18 +33,18 @@
 
 - [ ] 查 `git status --short --branch`、`git diff --check` 和 `git worktree list`。当前正常检出为 `main@ff4edaf`。移交文件包含上述已完成修改及设计和计划。保留后来发现的用户修改及原有暂存状态。
 - [ ] 在当前检出创建专用分支 `codex/production-reference`。同名分支已存在时先核对其归属。核对原暂存区和工作树。仅提交明确列出的本次文件。已有额外暂存时用指定路径的部分提交，保留其它暂存。如果额外变更与本次文件混合，先在隔离检出中应用可核对的本次差异。为后续 PR 获取远端 main 的实际基线。
-- [ ] 扩展 `build-profiles.spec.ts` 验证两个 locale 的构建产物包含架构正文，首页在无 Java/SQLite 时仍显示正常概览、目录 href 且没有练习入口。用生成的首页外壳或预渲染清单验证正文可预渲染的证据，接受 PPR 公共布局。工作区已有首页与设计计划纳入任务 6 的提交。任务 7 对最终产物重复这些断言。
+- [ ] 扩展 `build-profiles.spec.ts` 验证两个 locale 的构建产物包含架构正文，首页在未配置目录数据源时仍显示正常概览、目录 href 且没有练习入口。用生成的首页外壳或预渲染清单验证正文可预渲染的证据，接受 PPR 公共布局。工作区已有首页与设计计划纳入任务 6 的提交。任务 7 对最终产物重复这些断言。
 
-### 任务 1：让 Java 分页准确结束
+### 任务 1 确认目录末页
 
-**文件：** `src/server/adapters/java/catalog-v1.server.ts`、`test/integration/java-catalog.test.ts`、`test/support/{java-catalog-stub.mjs,run-built-app.mjs}`、`test/e2e/{catalog-http,catalog-journey}.spec.ts`。
+**文件** 发布目录适配器及其集成测试、`test/support/run-built-app.mjs`、`test/e2e/{catalog-http,catalog-journey}.spec.ts`。
 
-**接口：** `createJavaCatalogV1(config): CatalogPort` 沿用。Java 读函数在同一个 `readUpstream(signal => ...)` 中处理两次请求。
+**接口** 发布目录适配器实现 `CatalogPort`，在同一个 `readUpstream(signal => ...)` 中处理两次请求。
 
 - [ ] 用 MSW 在集成层加入有 12 本的末页与 12+1 的非末页。请求参数分别断言当前页零基值和下一页零基值，`size=12`，分类与认证头相同。断言 `expect(page.books).toHaveLength(12)`，前者 `hasNext=false`，后者 `hasNext=true`。不足 12 和第 100 页均只有一次调用。前探坏响应返回 `UPSTREAM_FAILURE`。用受控截止信号在第二次请求开始后触发 abort，断言只有一次 `AbortSignal.timeout(2000)` 且前探结束为 `UPSTREAM_TIMEOUT`。Request 可以克隆 signal 对象，测试观察 abort 传播。加错误媒体类型、无 Content-Length 超限流、过大的上游 404 详情，验收 502 或既有 404 映射且取消读取。
-- [ ] 运行 `pnpm test test/integration/java-catalog.test.ts`，先看到满末页、前探或调用数相关断言对旧实现失败。
+- [ ] 运行 `pnpm test test/integration`，先看到满末页、前探或调用数相关断言对旧实现失败。
 - [ ] 在适配器的 fetch 边界先检查 200 和媒体类型，用最大 256 KiB 的缓冲限制实际读入量，超限或早退时取消流。为非 200 返回无正文的同状态响应，保留详情 404 映射。用受限正文构造供 openapi-fetch 解析的响应。在 list 内提取读页操作，复用现有字段和重复 UUID 校验。仅在当前页满且 `page < maxCatalogPage` 查询下一页。调用同一个 `catalogPage` 生成结果。保留既有工厂接口和异常映射。
-- [ ] 新增可缓存的 stub 分类 `Exact shelf`，固定恰好一满页。BFF 12 本且 `hasNext:false`，同 locale 的 RSC 没有下一页链接。记录冷 BFF 两次 Java 调用，温 RSC/BFF 在同样条件下均零新增。把慢上游流式用例换到已有 `Full shelf` 的第 100 页，保留首块与最终书名断言，并核对一次 Java page=99 调用，避免意外把两次 950ms 延迟放入总截止时间。运行所有相关测试。
+- [ ] 新增可缓存的 stub 分类 `Exact shelf`，固定恰好一满页。BFF 12 本且 `hasNext:false`，同 locale 的 RSC 没有下一页链接。记录冷 BFF 两次 底层请求，温 RSC/BFF 在同样条件下均零新增。把慢上游流式用例换到已有 `Full shelf` 的第 100 页，保留首块与最终书名断言，并核对一次 `page=99` 请求，避免意外把两次 950ms 延迟放入总截止时间。运行所有相关测试。
 
 ### 任务 2：目录返回、语言 404 和键盘旅程
 
@@ -73,14 +73,14 @@
 
 - [ ] 先加测试并检查旧代码失败。传入敏感文本的异常并读取 BFF 响应。捕获传给日志记录器的 JSON。断言两处 `requestId` 一致，固定字段、502/504 正确、非负毫秒，应用自己的日志不含输入 URL、凭据、内部异常字符串和栈。400/404 不生成 5xx 记录。测试启动器可将生产子进程 stdout 和 stderr 同时转发并写入每个运行的日志。日志文件用测试运行独立临时目录和 server 名称或端口隔离，测试轮询 JSON 行。BFF 按响应 ID 匹配，页面用新日志增量匹配相同分类并确认有重试提示。
 - [ ] 在各入口选择固定的 entry，捕获 `performance.now()`。RSC 在 `connection()` 后的请求时内容中开始计时。在 BFF 现有错误响应里生成一次 ID 并复用给日志。日志用固定字段的一行 JSON，按 5xx 分类输出。RSC 已有降级分支调用该函数。缓存函数与公开键保持无请求数据。
-- [ ] 运行 `pnpm test test/unit/api-boundary.test.ts` 和相关 Playwright 故障用例。确保 API 快照生成无差异。用任务 1 的可缓存满页测试，从同 locale、无关键词且尚未缓存的 BFF 请求开始，记录 +2 次 Java 调用，再测 RSC/BFF 热读新增 0 次。记录响应耗时、环境和采集命令。慢上游首块、缓存和总截止时间由行为断言验收，耗时记录只作环境基线。
+- [ ] 运行 `pnpm test test/unit/api-boundary.test.ts` 和相关 Playwright 故障用例。确保 API 快照生成无差异。用任务 1 的可缓存满页测试，从同 locale、无关键词且尚未缓存的 BFF 请求开始，记录 +2 次 底层请求，再测 RSC/BFF 热读新增 0 次。记录响应耗时、环境和采集命令。慢上游首块、缓存和总截止时间由行为断言验收，耗时记录只作环境基线。
 
-### 任务 5：补齐复用文档与真实后端入口
+### 任务 5 整理运行与验证文档
 
 **文件：** `README.md`、`docs/README.md`、`docs/testing-strategy/README.md`、新建 `docs/operations/run-and-release.md`。
 
 - [ ] README 给出 Node 24、pnpm 11.25.0、`pnpm install --frozen-lockfile`、`DEMO_DATA_DIR="$PWD/.bookstore-demo"` 需导出、`pnpm demo:seed`、`pnpm dev:mock` 和 locale URL。明确用户创建种子和启动进程是开发操作。浏览器内的内容维持静态架构参考。
-- [ ] 运行手册列出 demo/release 环境变量、能力差异、实测条件、健康与就绪、release 构建部署以及回滚。真实 Java v1 运行指引使用 `de7ab0c373afe1dd3206034bb2e6a2d94b212726`。当前 OpenAPI 源码参考 SHA `14e511a` 与实测 SHA 有不同作用。参考 `git show 2f9adf0:docs/walkthroughs/01-catalog.md` 的源档恢复独立 Postgres 16、Redis 7、JDK 21、Gradle 构建、精确 checkout、Flyway 和种子导入步骤。无宿主 psql 时用新建数据库容器的 psql。保护历史记录的版本归属。
+- [ ] 运行手册列出 demo/release 环境变量、能力差异、实测条件、健康与就绪、release 构建部署以及回滚。
 - [ ] 地方性构建限制放在开发/验证说明，提供固定 Linux 容器入口。测试文档标明每层的运行命令、浏览器覆盖及 CI 失败产物。架构页给出新增功能和契约改动时查找对外入口、生成类型和测试层级的路径。记录 Node/pnpm 升级后应重做的门禁。通过一次干净目录的 demo 启动和只读验证。
 
 ### 任务 6：构建、启动和切回版本化 release 镜像
@@ -89,7 +89,7 @@
 
 **接口：** `bash scripts/test-release.sh` 从当前检出构建唯一临时标签，退出时清理它创建的临时测试容器与网络。`docker build --label org.opencontainers.image.revision=<SHA> -t bookstore:<SHA> .` 是文档支持的构建方法。
 
-- [ ] 写 smoke 并先验证没有发布路径时失败。使用独立 Docker 网络和临时 Java read-only fixture。使用禁止外网出站的 Docker 内部网络，从同网验证容器发起实际请求。fixture 在 `/api/v1/books` 返回 `application/json` 和合法列表，验证真实上游路径。分别运行配置了 fixture、没配 Java 的镜像。确认健康 200、就绪分别为 200 和 503、两个 locale 首页 200 且语言正确。从首页 HTML 取实际 `/_next/static/` CSS 或 JS URL，校验 200 和对应 MIME。同源目录响应体对应 fixture。正式启动器作为容器命令的一部分。
+- [ ] 写 smoke 并先验证没有发布路径时失败。使用仓库自带的目录替身。使用禁止外网出站的 Docker 内部网络，从同网验证容器发起实际请求。fixture 在 `/api/v1/books` 返回 `application/json` 和合法列表，核对镜像能通过 HTTP 读取目录。分别启动已配置目录替身和未配置数据源的发布镜像。确认健康 200、就绪分别为 200 和 503、两个 locale 首页 200 且语言正确。从首页 HTML 取实际 `/_next/static/` CSS 或 JS URL，校验 200 和对应 MIME。同源目录响应体对应 fixture。正式启动器作为容器命令的一部分。
 - [ ] 基于 `node:24.15.0-bookworm-slim` 两阶段构建。在共有基础层用 npm 预装固定 `pnpm@11.25.0` 并确认与仓库声明一致，运行时无需外网。builder 严格按锁安装并运行正式构建。runtime 拷贝实际启动所需的配置、启动脚本、安装依赖、`public` 与 `.next`，以 Node 用户、端口 3000 和 `pnpm start` 运行。构建和镜像不得带入本地环境文件、已有产物和 demo 数据。Docker smoke 验证期望行为、实际进程用户的 UID 非零与镜像版本标签。
 - [ ] 发布指南在旧容器或旧镜像仍保留时，用上一版本镜像标识启动同一配置，独立完成就绪检查，再切换流量。本任务通过 `pnpm check` 和 `pnpm build` 后提交一份可构建的实现基线。任务 7 用基线提交及最终提交分别构建两个不同的镜像 ID 和 SHA 标签。在隔离网络中让最终版提供固定访问入口。切回基线，使同一入口确实由基线容器服务，再查就绪与 BFF。用 `docker inspect` 确认入口对应容器的镜像 ID 与基线一致。这是一份参考演练，发布第一版之后才有可切回的历史产物。
 
@@ -97,13 +97,12 @@
 
 **文件：** `.github/workflows/ci.yml`、PR 描述及本地忽略的测试产物。
 
-- [ ] 在 CI 增加独立 `release-image` job，运行任务 6 的隔离 smoke，不使用真实 Java 和外部凭据。先执行 `pnpm check` 和 `pnpm build`，再提交 CI 改动。最终验收从干净已提交 HEAD 执行。若工作区含用户改动，使用临时、保有 Git 元数据的干净检出运行验收并保留用户工作树。`git archive <SHA>` 仅用于镜像或纯源码打包并显式传入 SHA。视觉脚本需要 Git 元数据。
+- [ ] 在 CI 增加独立 `release-image` job，运行任务 6 的隔离烟测。先执行 `pnpm check` 和 `pnpm build`，再提交 CI 改动。最终验收从干净已提交 HEAD 执行。若工作区含用户改动，使用临时、保有 Git 元数据的干净检出运行验收并保留用户工作树。`git archive <SHA>` 仅用于镜像或纯源码打包并显式传入 SHA。视觉脚本需要 Git 元数据。
 - [ ] 冻结安装后运行 `pnpm peers check`、`pnpm check`、`pnpm api:check`、`pnpm test`。通过条件为命令退出 0、生成契约一致，记录实际测试数。
 - [ ] 执行 `pnpm build` 与 `pnpm build:demo`，再在清除 `BOOKSTORE_E2E_DEV` 的环境运行全量 `pnpm test:e2e`，核对报告实际运行 demo 和 release 两个配置。使用 `bash scripts/test-visual.sh` 在仓库指定镜像运行全部视觉用例。截图预期改变时用同一脚本的 `--update-snapshots` 生成并重跑。运行固定环境里的 `bash scripts/test-release.sh` 验收部署产物，由最终发布候选和任务 6 的已提交版本完成回滚演练。
-- [ ] 当前宿主已有 `127.0.0.1:8081` 的真实 Java v1。只读探针已核对 JAR 对应 `de7ab0c`，健康 200、尾页 1、Architecture 6、已知详情 200、缺失 404。先用短超时验证同一服务和种子，核对正在运行的 JAR 路径和 SHA 证据。移交信息中记录了当前本机实例的检出路径及 JAR 指纹，运行手册以固定公开版本为准。证据或实例不符时由固定版本重新构建专用环境。宿主能构建时以 `JAVA_CATALOG_BASE_URL=http://127.0.0.1:8081 pnpm test:e2e:java` 执行。受宿主端口限制时在同一个能构建并运行浏览器的 Linux 容器里执行，Docker Desktop 网关 `http://host.docker.internal:8081` 已实测可获取真实 Java 尾页。此套件以构建出来的正式模式验证。记录前端 commit、Java SHA、运行产物识别依据及两条用例全部通过的输出。若该实例不可用，按运行手册启动专用 PostgreSQL、Redis 与同一 SHA 的 Java，只在新建库写种子。真实 Java 测试成功是合并条件。
 - [ ] 对实际 diff 做独立对抗性代码审查。复核上面各层的证据与当前 HEAD 一致，修完所有确认为本次范围的可操作问题，再按受影响的层重跑。创建 PR，正文包含七项目标的改变和各层结果。用 GitHub 的最新 PR 状态、合并性、checks 和 review threads 作为合并依据。
 - [ ] 所有验收通过后，核对最新 PR HEAD 的 `checks`、`visual`、`release-image` 三个 PR job 均为 success，检查未解决评审和 GitHub 合并条件。用 `gh pr merge --match-head-commit <verified SHA>` 或 GitHub 等价的 expected head SHA 合并到 `main`。以 PR 的 merged 状态、合并 SHA 和远端 main 的历史复核。保留项目目录中本次以外的修改。
 
 ## 对抗评审与验收记录
 
-首轮独立评审核对了架构和契约、目录体验、运维交付。修订覆盖满页对既有流式和缓存用例的影响、总截止与正文限制、双语首页的实际合约、详情来源与键盘断言、通用 HTTP 边界及日志捕获、最终提交隔离、离线发布和两版本回滚、真实 Java 身份与 CI 门禁。复核后加入相同数量下改关键词的播报、同入口回滚和 Git 检出验收。终轮核对修订版是否还有可执行缺口。实现会话在 PR 中记录最终各层命令、结果、真实 Java SHA 和参考镜像烟测。
+首轮独立评审核对了架构和契约、目录体验、运维交付。修订覆盖满页对既有流式和缓存用例的影响、总截止与正文限制、双语首页的实际合约、详情来源与键盘断言、通用 HTTP 边界及日志捕获、最终提交隔离、离线发布和两版本回滚、CI 验收。复核后加入相同数量下改关键词的播报、同入口回滚和 Git 检出验收。终轮核对修订版是否还有可执行缺口。实现会话在 PR 中记录最终各层命令、结果与发布镜像烟测。

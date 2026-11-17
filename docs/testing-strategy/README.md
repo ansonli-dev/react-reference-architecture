@@ -70,6 +70,6 @@ pnpm test:e2e
 bash scripts/test-visual.sh
 ```
 
-真实 Java 使用 [运行手册](../operations/run-and-release.md#真实-java-v1-复验) 中固定版本和独立数据，运行 `pnpm test:e2e:java`。它通过正式构建对照 Java 的 OpenAPI、BFF、RSC 与浏览器结果；故障、超时和日志关联仍在普通 E2E 的替身上注入。容器交付用 `bash scripts/test-release.sh` 在内部 Docker 网络验证参考镜像。
+端到端测试用仓库自带的目录替身验证故障、超时和日志关联。用 `bash scripts/test-release.sh` 在内部 Docker 网络验证发布镜像的健康、就绪、目录和静态资源。[镜像构建与运行](../operations/run-and-release.md#构建并运行发布镜像)
 
 记录受控缓存基线时用 `pnpm test:e2e --project=release -g 'cold BFF result' --reporter=list,json` 并将 `PLAYWRIGHT_JSON_OUTPUT_NAME` 指到单独报告路径。报告附件 `catalog-cache-baseline.json` 标明 Node 版本、冷 BFF、热页面与热 BFF 的实际耗时和上游调用次数。耗时供同环境对照；门禁依据调用次数、流式外壳顺序和超时分类。生产 E2E 测试启动器还把每个服务的 stdout/stderr 复制到临时目录中的独立日志，供请求 ID 和降级事件断言。
