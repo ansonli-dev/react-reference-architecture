@@ -45,3 +45,20 @@
 ## 约束验证
 
 `pnpm check` 包含类型、Lint、格式和架构检查。架构测试覆盖跨 feature 导入、绕过公开入口和客户端间接引入服务端模块等反例。生产构建与页面 E2E 覆盖一次导航中服务端 HTML、客户端筛选、语言切换和缺失页反馈。[架构约束测试](../../test/unit/architecture.test.ts) · [目录页面 E2E](../../test/e2e/catalog-journey.spec.ts)
+
+### 可视化回归
+
+视觉 CI 用固定版本的 Linux ARM64 Playwright 镜像和教学种子比较截图。基线覆盖桌面架构概览、桌面与移动目录和深色详情。预期的页面变更应和基线一起评审。截图不一致时，CI 保留基线、实际截图和差异图。
+
+```bash
+bash scripts/test-visual.sh
+bash scripts/test-visual.sh --update-snapshots
+```
+
+更新命令将新截图复制到 [test/visual/screenshots](../../test/visual/screenshots)，供评审与代码一起查看。同一命令的运行结果保存在 `test-results/visual-container/`。
+
+已经启动的预览可以用下面的命令检查。它直接访问实际地址，在桌面和移动视口检查 CSS 请求、书卡布局、导航可见性和横向溢出。运行前用 `pnpm exec playwright install chromium --only-shell` 安装 Chromium。
+
+```bash
+BOOKSTORE_VISUAL_URL=http://127.0.0.1:3000 pnpm test:e2e:visual
+```

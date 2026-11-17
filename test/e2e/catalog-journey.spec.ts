@@ -50,6 +50,31 @@ test('server-rendered markup contains real book links and supports detail naviga
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
 });
 
+test('the architecture exercise connects the styled catalog to its JSON result', async ({
+  page,
+  request,
+}) => {
+  await page.goto('/zh-CN');
+  const exercise = page.getByRole('region', { name: '目录练习' });
+  const jsonLink = exercise.getByRole('link', { name: '查看目录 JSON' });
+  await expect(jsonLink).toHaveAttribute(
+    'href',
+    '/api/v1/catalog/books?category=Architecture',
+  );
+  const response = await request.get((await jsonLink.getAttribute('href'))!);
+  await expect(response).toBeOK();
+  const { books }: { books: { title: string }[] } = await response.json();
+  expect(books.length).toBeGreaterThan(0);
+
+  await exercise.getByRole('link', { name: '打开筛选后的目录' }).click();
+  await expect(page).toHaveURL('/zh-CN/books?category=Architecture');
+  const cards = page.getByRole('article');
+  await expect(cards.first().locator('..')).toHaveCSS('display', 'grid');
+  await expect(cards.getByRole('heading', { level: 2 })).toHaveText(
+    books.map((book) => book.title),
+  );
+});
+
 test('direct filter URLs, resets, pagination and Back share the URL state', async ({
   page,
 }, info) => {

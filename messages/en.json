@@ -14,23 +14,30 @@
   },
   "Home": {
     "title": "Modern React reference architecture",
-    "description": "Browse the bookstore to see how server rendering, client interactions, and a BFF work together.",
+    "description": "Follow a catalog filter to see how the browser, the Next.js server, and the same-origin API work together.",
+    "exercise": {
+      "title": "Catalog exercise",
+      "filter": "Choose Architecture in the book catalog and apply the filter. Look for <query></query> in the address. Reload the page to see the same category.",
+      "compare": "Open the catalog page and its JSON for the same filter. Compare the titles and stock counts. The page and the API handle their own requests and call the same server-side catalog reader.",
+      "pageLink": "Open the filtered catalog",
+      "jsonLink": "View catalog JSON"
+    },
     "boundaries": "Application responsibilities",
     "browser": {
       "title": "Browser",
-      "description": "Interactive components, forms, and client drafts"
+      "description": "Takes the filter input and stores the applied category and page in the URL."
     },
     "renderer": {
       "title": "Next.js server",
-      "description": "Page rendering, route composition, and data access"
+      "description": "Reads the URL and catalog data to render the book cards on the server."
     },
     "bff": {
       "title": "BFF",
-      "description": "Sessions, API aggregation, and backend adaptation"
+      "description": "The same-origin API validates the request and returns catalog results as JSON."
     },
     "backend": {
       "title": "Business backend",
-      "description": "Business rules, transactions, and authoritative data"
+      "description": "Java Catalog supplies titles, prices, and stock in release mode."
     }
   },
   "Catalog": {

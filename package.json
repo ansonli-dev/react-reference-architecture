@@ -22,6 +22,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "test:e2e:java": "playwright test --config playwright.java.config.ts",
+    "test:e2e:visual": "playwright test --config playwright.visual.config.ts",
     "demo:seed": "node scripts/demo-seed.mjs"
   },
   "dependencies": {
