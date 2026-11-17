@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { components } from '@/shared/api/generated/bff';
 import {
   firstBookId,
   missingBookId,
@@ -24,6 +25,7 @@ test('serves typed lists and details from the configured data source', async ({
 }, info) => {
   const first = await request.get(books);
   expect(first.status()).toBe(200);
+  expect(first.headers()['content-type']).toMatch(/^application\/json(?:;|$)/i);
   expect(first.headers()['cache-control']).toBe('no-store');
   const title =
     info.project.name === 'demo'
@@ -32,15 +34,16 @@ test('serves typed lists and details from the configured data source', async ({
   const expected = {
     id: firstBookId,
     title,
+    author: '林岚',
+    category: 'Architecture',
     priceMinor: 4900,
     currency: 'CNY',
     stock: 5,
-  };
+  } satisfies components['schemas']['Book'];
   const page = await first.json();
-  expect(page).toMatchObject({ page: 1, hasNext: true });
+  expect(page).toEqual({ page: 1, hasNext: true, books: expect.any(Array) });
   expect(page.books).toHaveLength(12);
-  expect(page.books[0]).toMatchObject(expected);
-  expect(page.books[0]).not.toHaveProperty('priceCents');
+  expect(page.books[0]).toEqual(expected);
 
   const last = await request.get(books + '?page=2', {
     headers: { 'Accept-Language': 'en' },
@@ -63,17 +66,24 @@ test('serves typed lists and details from the configured data source', async ({
 
   const detail = await request.get(books + '/' + firstBookId);
   expect(detail.status()).toBe(200);
-  expect(await detail.json()).toMatchObject(expected);
+  expect(detail.headers()['content-type']).toMatch(
+    /^application\/json(?:;|$)/i,
+  );
+  expect(detail.headers()['cache-control']).toBe('no-store');
+  expect(await detail.json()).toEqual(expected);
   expect((await request.get('/api/ready')).status()).toBe(200);
 });
 
 test('validates inputs and distinguishes an unknown UUID', async ({
   request,
 }, info) => {
+  const requestId = expect.stringMatching(
+    /^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$/i,
+  );
   const invalid = await request.get(books + '/not-a-uuid');
   expect(invalid.status()).toBe(400);
   expect(await invalid.json()).toEqual({
-    error: { code: 'INVALID_INPUT', requestId: expect.any(String) },
+    error: { code: 'INVALID_INPUT', requestId },
   });
   expect((await request.get(books + '?page=1&page=2')).status()).toBe(400);
   if (info.project.name === 'release')
@@ -81,8 +91,11 @@ test('validates inputs and distinguishes an unknown UUID', async ({
 
   const unknown = await request.get(books + '/' + missingBookId);
   expect(unknown.status()).toBe(404);
+  expect(unknown.headers()['content-type']).toMatch(
+    /^application\/json(?:;|$)/i,
+  );
   expect(await unknown.json()).toEqual({
-    error: { code: 'BOOK_NOT_FOUND', requestId: expect.any(String) },
+    error: { code: 'BOOK_NOT_FOUND', requestId },
   });
 });
 
