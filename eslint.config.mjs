@@ -13,6 +13,8 @@ const eslintConfig = defineConfig([
     '.bookstore-demo/**',
     'test-results/**',
     'playwright-report/**',
+    'src/shared/api/generated/**',
+    'src/server/adapters/java/generated/**',
     'out/**',
     'build/**',
     'next-env.d.ts',

@@ -6,3 +6,5 @@ pnpm-lock.yaml
 next-env.d.ts
 test-results
 playwright-report
+src/shared/api/generated
+src/server/adapters/java/generated
