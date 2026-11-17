@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
-import { mkdtempSync, rmSync, symlinkSync } from 'node:fs';
+import { appendFileSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -73,20 +73,34 @@ try {
       'Architecture',
       'Programming',
       'Full shelf',
+      'Exact shelf',
     ]);
   }
   const runner = fileURLToPath(
     new URL('../../scripts/run-app.mjs', import.meta.url),
   );
+  const logs = env.BOOKSTORE_E2E_LOG_DIR;
+  const logFile = logs && join(logs, port + '.log');
   const child = spawn(process.execPath, [runner, 'start', profile], {
     cwd: work,
     env,
-    stdio: 'inherit',
+    stdio: logFile ? ['ignore', 'pipe', 'pipe'] : 'inherit',
   });
+  if (logFile) {
+    for (const [stream, destination] of [
+      [child.stdout, process.stdout],
+      [child.stderr, process.stderr],
+    ]) {
+      stream.on('data', (chunk) => {
+        appendFileSync(logFile, chunk);
+        destination.write(chunk);
+      });
+    }
+  }
   for (const signal of ['SIGINT', 'SIGTERM']) {
     process.once(signal, () => child.kill(signal));
   }
-  const [code, signal] = await once(child, 'exit');
+  const [code, signal] = await once(child, 'close');
   process.exitCode = code ?? (signal === 'SIGTERM' ? 0 : 1);
 } finally {
   stub?.closeAllConnections();

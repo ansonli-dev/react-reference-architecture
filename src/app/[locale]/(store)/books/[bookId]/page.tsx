@@ -8,27 +8,38 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import {
   BookCover,
   CatalogNotice,
+  catalogHref,
   formatBookPrice,
 } from '@/features/catalog/client';
-import { parseBookId } from '@/features/catalog/model';
+import {
+  parseBookId,
+  parseCatalogQuery,
+  type CatalogQuery,
+} from '@/features/catalog/model';
 import { routing } from '@/i18n/routing';
-import { readBook } from '@/server/catalog.server';
+import { readBook, supportsCatalogSearch } from '@/server/catalog.server';
+import { reportCatalogFailure } from '@/server/observability/catalog.server';
 import { ApiFailure } from '@/shared/api/error';
 import Loading from '../loading';
 
 type DetailsProps = PageProps<'/[locale]/books/[bookId]'>;
 
 // The localized shell metadata is the fallback. No details are fetched for metadata.
-export default function BookDetailsPage({ params }: DetailsProps) {
+export default function BookDetailsPage({
+  params,
+  searchParams,
+}: DetailsProps) {
   return (
     <Suspense fallback={<Loading />}>
-      <BookDetails params={params} />
+      <BookDetails params={params} searchParams={searchParams} />
     </Suspense>
   );
 }
 
-async function BookDetails({ params }: Pick<DetailsProps, 'params'>) {
+async function BookDetails({ params, searchParams }: DetailsProps) {
   await connection();
+  // eslint-disable-next-line react-hooks/purity -- Times this request without affecting rendered output.
+  const startedAt = performance.now();
   const { locale, bookId } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
@@ -43,19 +54,34 @@ async function BookDetails({ params }: Pick<DetailsProps, 'params'>) {
     notFound();
   }
 
+  const { category, page, q } = await searchParams;
+  let sourceQuery: CatalogQuery = { page: 1 };
+  try {
+    sourceQuery = parseCatalogQuery({
+      category,
+      page,
+      q: supportsCatalogSearch ? q : undefined,
+    });
+  } catch (error) {
+    if (!(error instanceof ApiFailure) || error.code !== 'INVALID_INPUT')
+      throw error;
+  }
+  const back = catalogHref(base, sourceQuery);
+
   let book;
   try {
     book = await readBook(locale, id);
   } catch (error) {
     if (!(error instanceof ApiFailure)) throw error;
+    reportCatalogFailure('page.catalog.detail', error, startedAt);
     return (
       <>
-        <Link href={base} className="text-primary underline">
+        <Link href={back} prefetch={false} className="text-primary underline">
           {t('back')}
         </Link>
         <CatalogNotice
           message={t('unavailable')}
-          href={base + '/' + id}
+          href={catalogHref(base + '/' + id, sourceQuery)}
           action={t('retry')}
         />
       </>
@@ -66,7 +92,7 @@ async function BookDetails({ params }: Pick<DetailsProps, 'params'>) {
   return (
     <>
       <Link
-        href={base}
+        href={back}
         prefetch={false}
         className="text-primary inline-flex items-center gap-1 rounded-sm text-sm font-semibold hover:underline"
       >

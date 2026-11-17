@@ -18,6 +18,7 @@ import {
   readCatalogCategories,
   supportsCatalogSearch,
 } from '@/server/catalog.server';
+import { reportCatalogFailure } from '@/server/observability/catalog.server';
 import { ApiFailure } from '@/shared/api/error';
 
 type BooksProps = PageProps<'/[locale]/books'>;
@@ -64,6 +65,8 @@ async function CatalogContent({
   searchParams: BooksProps['searchParams'];
 }) {
   await connection();
+  // eslint-disable-next-line react-hooks/purity -- Times this request without affecting rendered output.
+  const startedAt = performance.now();
   const t = await getTranslations({ locale, namespace: 'Catalog' });
   const base = '/' + locale + '/books';
   const input = { ...(await searchParams) };
@@ -99,6 +102,7 @@ async function CatalogContent({
     ]);
   } catch (error) {
     if (!(error instanceof ApiFailure)) throw error;
+    reportCatalogFailure('page.catalog.list', error, startedAt);
     return (
       <CatalogNotice
         message={t('unavailable')}
@@ -111,7 +115,6 @@ async function CatalogContent({
   return (
     <>
       <CatalogFilters
-        key={JSON.stringify([query.category, query.q])}
         base={base}
         query={query}
         categories={categories}
@@ -124,13 +127,29 @@ async function CatalogContent({
           apply: t('apply'),
         }}
       />
-      {data.books.length ? (
-        <div className="mt-7 grid gap-4 min-[490px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+      <p
+        role="status"
+        aria-atomic="true"
+        className={
+          data.books.length
+            ? 'text-muted mt-5 text-sm'
+            : 'border-line bg-surface mt-7 rounded-lg border p-5'
+        }
+      >
+        {data.books.length
+          ? t('results', { count: data.books.length })
+          : t('empty')}
+        {query.category &&
+          ' ' + t('resultsCategory', { category: query.category })}
+        {query.q && ' ' + t('resultsQuery', { q: query.q })}
+      </p>
+      {data.books.length > 0 && (
+        <div className="mt-3 grid gap-4 min-[490px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {data.books.map((book) => (
             <BookCard
               key={book.id}
               book={book}
-              href={base + '/' + book.id}
+              href={catalogHref(base + '/' + book.id, query)}
               locale={locale}
               stock={
                 book.stock ? t('stock', { count: book.stock }) : t('soldOut')
@@ -138,10 +157,6 @@ async function CatalogContent({
             />
           ))}
         </div>
-      ) : (
-        <p className="border-line bg-surface mt-7 rounded-lg border p-5">
-          {t('empty')}
-        </p>
       )}
       {(data.page > 1 || data.hasNext) && (
         <nav

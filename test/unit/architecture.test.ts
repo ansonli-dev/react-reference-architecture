@@ -9,6 +9,7 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ESLint } from 'eslint';
 import { describe, expect, it } from 'vitest';
 
 function runGate(files: Record<string, string>) {
@@ -55,6 +56,56 @@ describe('architecture gate', () => {
     expect(result.output).toContain(
       'src/app/widget.tsx -> src/shared/bridge.ts -> src/shared/secret.ts',
     );
+  });
+
+  it.each(['', "'use client'; "])(
+    'checks a public client entry even when only an RSC imports it (directive: %s)',
+    (directive) => {
+      const result = runGate({
+        'src/app/page.ts':
+          "export { answer } from '@/features/catalog/client';",
+        'src/features/catalog/client.ts':
+          directive + "export { answer } from './bridge';",
+        'src/features/catalog/bridge.ts':
+          "export { answer } from '@/shared/secret';",
+        'src/shared/secret.ts':
+          "import 'server-only'; export const answer = 42;",
+      });
+      expect(result.exit).toBe(1);
+      expect(result.output.match(/^no-client-to-server: .*$/gm)).toEqual([
+        'no-client-to-server: src/features/catalog/client.ts -> src/features/catalog/bridge.ts -> src/shared/secret.ts',
+      ]);
+    },
+  );
+
+  it('allows type-only imports through client public entries', () => {
+    const result = runGate({
+      'src/app/page.ts':
+        "export type { Secret } from '@/features/catalog/client';",
+      'src/features/catalog/client.ts':
+        "export type { Secret } from '@/shared/secret';",
+      'src/shared/secret.ts':
+        "import 'server-only'; export type Secret = string;",
+    });
+    expect(result.exit).toBe(0);
+  });
+
+  it('limits global fetch in the model entry and descendants but allows it in adapters', async () => {
+    const eslint = new ESLint();
+    const cases = [
+      ['src/features/catalog/model.ts', 'fetch', 1],
+      ['src/features/catalog/model/nested/rules.ts', 'globalThis.fetch', 1],
+      ['src/server/adapters/java/catalog-v1.server.ts', 'fetch', 0],
+    ] as const;
+    for (const [filePath, fetchName, errors] of cases) {
+      const [result] = await eslint.lintText(
+        'export const read = () => ' + fetchName + '("https://example.test");',
+        { filePath },
+      );
+      expect(
+        result.messages.map(({ ruleId, severity }) => [ruleId, severity]),
+      ).toEqual(errors ? [['no-restricted-globals', 2]] : []);
+    }
   });
 
   it('forbids cross-feature dependencies and feature internals in composition', () => {

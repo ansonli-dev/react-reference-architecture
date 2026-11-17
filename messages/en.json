@@ -1,27 +1,20 @@
 {
   "Shell": {
     "title": "React Reference Architecture",
-    "description": "Learn modern React application architecture through a working bookstore.",
+    "description": "A reference architecture for modern React applications, built around an online book catalog.",
     "brand": "Reference Books",
     "nav": "Main navigation",
     "home": "Architecture",
     "books": "Book catalog",
     "theme": "Toggle dark theme",
-    "demo": "Teaching mode",
+    "demo": "Demo mode",
     "skip": "Skip to content",
     "notFound": "Page not found",
     "backHome": "Back to home"
   },
   "Home": {
     "title": "Modern React reference architecture",
-    "description": "Follow a catalog filter to see how the browser, the Next.js server, and the same-origin API work together.",
-    "exercise": {
-      "title": "Catalog exercise",
-      "filter": "Choose Architecture in the book catalog and apply the filter. Look for <query></query> in the address. Reload the page to see the same category.",
-      "compare": "Open the catalog page and its JSON for the same filter. Compare the titles and stock counts. The page and the API handle their own requests and call the same server-side catalog reader.",
-      "pageLink": "Open the filtered catalog",
-      "jsonLink": "View catalog JSON"
-    },
+    "description": "The bookstore catalog shows how the browser, Next.js server, same-origin API, and backend work together.",
     "boundaries": "Application responsibilities",
     "browser": {
       "title": "Browser",
@@ -33,7 +26,7 @@
     },
     "bff": {
       "title": "BFF",
-      "description": "The same-origin API validates the request and returns catalog results as JSON."
+      "description": "Validates same-origin HTTP requests, uses the same catalog reader as the page, and returns JSON."
     },
     "backend": {
       "title": "Business backend",
@@ -51,6 +44,9 @@
     "retry": "Try again",
     "loading": "Loading books",
     "empty": "No books match these filters.",
+    "results": "{count, plural, one {# book.} other {# books.}}",
+    "resultsCategory": "Category: {category}.",
+    "resultsQuery": "Search: {q}.",
     "previous": "Previous page",
     "next": "Next page",
     "pagination": "Catalog pagination",

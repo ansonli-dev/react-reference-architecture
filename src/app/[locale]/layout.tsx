@@ -7,6 +7,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { routing } from '@/i18n/routing';
 import { ThemeSwitch } from '@/shared/ui/theme-switch';
 import { LanguageLink, LanguageSwitch } from './language-switch';
+import { SkipLink } from './skip-link';
 import '../globals.css';
 
 export function generateStaticParams() {
@@ -33,12 +34,7 @@ export default async function LocaleLayout({
   return (
     <html lang={locale}>
       <body>
-        <a
-          href="#main"
-          className="focus:bg-surface sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-10 focus:rounded-md focus:px-4 focus:py-2"
-        >
-          {t('skip')}
-        </a>
+        <SkipLink label={t('skip')} />
         <header className="border-line bg-surface border-b">
           <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-x-5 gap-y-2 px-5 py-3 sm:px-8">
             <Link
@@ -78,6 +74,7 @@ export default async function LocaleLayout({
         )}
         <main
           id="main"
+          tabIndex={-1}
           className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-14"
         >
           {children}

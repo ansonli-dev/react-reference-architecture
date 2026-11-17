@@ -12,6 +12,13 @@ const books = demoBooks.map(({ priceMinor, ...book }) => ({
   priceCents: priceMinor,
 }));
 
+const exactShelf = books.slice(0, 12).map((book, i) => ({
+  ...book,
+  id: '00000000-0000-4000-8000-' + String(9001 + i).padStart(12, '0'),
+  category: 'Exact shelf',
+  title: 'Exact shelf book ' + (i + 1),
+}));
+
 export async function startJavaCatalogStub() {
   let scenario = {};
   const calls = [];
@@ -67,15 +74,20 @@ export async function startJavaCatalogStub() {
           }),
         );
       }
-      const batch = category
-        ? books.filter((book) => book.category === category)
-        : books;
+      const batch =
+        category === 'Exact shelf'
+          ? exactShelf
+          : category
+            ? books.filter((book) => book.category === category)
+            : books;
       const result = batch.slice(page * size, (page + 1) * size);
       if (mode === 'unsafe' && result.length)
         return json(200, [{ ...result[0], priceCents: 9007199254740992 }]);
       return json(200, result);
     }
-    const book = books.find(({ id }) => url.pathname === '/api/v1/books/' + id);
+    const book = [...books, ...exactShelf].find(
+      ({ id }) => url.pathname === '/api/v1/books/' + id,
+    );
     if (book) return json(200, book);
     return json(404, { message: 'private stub detail' });
   });

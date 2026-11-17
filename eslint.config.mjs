@@ -5,6 +5,21 @@ import nextTs from 'eslint-config-next/typescript';
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    files: [
+      'src/features/*/model.ts',
+      'src/features/*/model/**/*.{js,jsx,ts,tsx,mjs,cjs,mts,cts}',
+    ],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        {
+          globals: [{ name: 'fetch', message: 'Keep HTTP reads in adapters.' }],
+          checkGlobalObject: true,
+        },
+      ],
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

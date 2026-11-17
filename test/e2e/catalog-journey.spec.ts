@@ -50,29 +50,20 @@ test('server-rendered markup contains real book links and supports detail naviga
   await expect(page.getByRole('heading', { name: title })).toBeVisible();
 });
 
-test('the architecture exercise connects the styled catalog to its JSON result', async ({
+test('the filtered catalog shows the same titles as its JSON response', async ({
   page,
   request,
 }) => {
-  await page.goto('/zh-CN');
-  const exercise = page.getByRole('region', { name: '目录练习' });
-  const jsonLink = exercise.getByRole('link', { name: '查看目录 JSON' });
-  await expect(jsonLink).toHaveAttribute(
-    'href',
-    '/api/v1/catalog/books?category=Architecture',
-  );
-  const response = await request.get((await jsonLink.getAttribute('href'))!);
+  const query = '?category=Architecture';
+  const response = await request.get('/api/v1/catalog/books' + query);
   await expect(response).toBeOK();
   const { books }: { books: { title: string }[] } = await response.json();
   expect(books.length).toBeGreaterThan(0);
 
-  await exercise.getByRole('link', { name: '打开筛选后的目录' }).click();
-  await expect(page).toHaveURL('/zh-CN/books?category=Architecture');
-  const cards = page.getByRole('article');
-  await expect(cards.first().locator('..')).toHaveCSS('display', 'grid');
-  await expect(cards.getByRole('heading', { level: 2 })).toHaveText(
-    books.map((book) => book.title),
-  );
+  await page.goto('/zh-CN/books' + query);
+  await expect(
+    page.getByRole('article').getByRole('heading', { level: 2 }),
+  ).toHaveText(books.map((book) => book.title));
 });
 
 test('direct filter URLs, resets, pagination and Back share the URL state', async ({
@@ -107,6 +98,119 @@ test('direct filter URLs, resets, pagination and Back share the URL state', asyn
       name: sourceTitle(info.project.name, 'Modern CSS Layout'),
       exact: true,
     }),
+  ).toBeVisible();
+});
+
+test('details return to the originating catalog page and preserve it on language switches', async ({
+  page,
+}, info) => {
+  const cases = [
+    {
+      query: '?page=2',
+      title: 'Modern CSS Layout',
+      id: '00000000-0000-4000-8000-000000000114',
+    },
+    {
+      query: '?category=Architecture',
+      title: 'React 应用架构',
+      id: firstBookId,
+    },
+  ];
+  if (info.project.name === 'demo')
+    cases.push({
+      query: '?category=Architecture&q=React',
+      title: 'React 应用架构',
+      id: firstBookId,
+    });
+  for (const { query, title, id } of cases) {
+    const detail = '/books/' + id;
+    const list = '/books' + query;
+    await page.goto('/en' + list);
+    await page
+      .getByRole('link', {
+        name: sourceTitle(info.project.name, title),
+        exact: true,
+      })
+      .click();
+    await expect(page).toHaveURL('/en' + detail + query);
+    await expect(
+      page.getByRole('heading', {
+        name: sourceTitle(info.project.name, title),
+      }),
+    ).toBeVisible();
+    const back = page.getByRole('link', { name: 'Back to books' });
+    await expect(back).toHaveAttribute('href', '/en' + list);
+    if (query.includes('category')) {
+      await page.getByRole('link', { name: '简体中文' }).click();
+      await expect(page).toHaveURL('/zh-CN' + detail + query);
+      const returnToList = page.getByRole('link', { name: '返回目录' });
+      await expect(returnToList).toHaveAttribute('href', '/zh-CN' + list);
+      await returnToList.click();
+      await expect(page).toHaveURL('/zh-CN' + list);
+      await expect(page.getByLabel('分类')).toHaveValue('Architecture');
+    } else {
+      await back.click();
+      await expect(page).toHaveURL('/en' + list);
+      await expect(page.getByText('Page 2', { exact: true })).toBeVisible();
+    }
+  }
+});
+
+test('a detail only uses valid known filters for its local return link', async ({
+  page,
+}, info) => {
+  const cases = [
+    ['', ''],
+    ['?category=Architecture&page=2&page=3', ''],
+    ['?category=Architecture&page=101', ''],
+    [
+      '?returnTo=https%3A%2F%2Foutside.example%2F&category=Architecture&page=1',
+      '?category=Architecture',
+    ],
+    [
+      '?category=Architecture&q=React',
+      info.project.name === 'demo'
+        ? '?category=Architecture&q=React'
+        : '?category=Architecture',
+    ],
+  ];
+  for (const [query, returned] of cases) {
+    await page.goto('/en/books/' + firstBookId + query);
+    await expect(
+      page.getByRole('link', { name: 'Back to books' }),
+    ).toHaveAttribute('href', '/en/books' + returned);
+  }
+});
+
+test('a failing detail retains the catalog and retries the same URL', async ({
+  page,
+  request,
+}, info) => {
+  test.skip(info.project.name !== 'release');
+  const list = '/en/books?category=Architecture';
+  const detail =
+    '/en/books/00000000-0000-4000-8000-000000000106?category=Architecture';
+  await page.goto(list);
+  const book = page.getByRole('link', {
+    name: 'Java fixture: 可靠交付实践',
+    exact: true,
+  });
+  await expect(book).toHaveAttribute('href', detail);
+  await setJavaScenario(request, { mode: 'failure' });
+  await book.click();
+  await expect(page.getByRole('main').getByRole('alert')).toContainText(
+    'Books are temporarily unavailable',
+  );
+  await expect(
+    page.getByRole('link', { name: 'Back to books' }),
+  ).toHaveAttribute('href', list);
+  const retry = page.getByRole('link', { name: 'Try again' });
+  await expect(retry).toHaveAttribute('href', detail);
+  await setJavaScenario(request);
+  await retry.click();
+  await expect(page).toHaveURL(detail);
+  await expect(
+    page.getByRole('heading', { name: 'Java fixture: 可靠交付实践' }),
   ).toBeVisible();
 });
 
@@ -196,7 +300,7 @@ test('streams the static shell before the delayed upstream books', async ({
   test.skip(info.project.name !== 'release');
   await setJavaScenario(request, { delayMs: 950, resetCalls: true });
   const response = await fetch(
-    baseURL + '/en/books?category=Full+shelf&page=95',
+    baseURL + '/en/books?category=Full+shelf&page=100',
     {
       headers: { 'Accept-Encoding': 'identity' },
     },
@@ -213,7 +317,7 @@ test('streams the static shell before the delayed upstream books', async ({
     }
     expect(html).toContain('>Book catalog</h1>');
     expect(html).toContain('>Loading books</p>');
-    expect(html).not.toContain('Archive book 1129');
+    expect(html).not.toContain('Archive book 1189');
 
     for (;;) {
       const chunk = await reader.read();
@@ -221,10 +325,10 @@ test('streams the static shell before the delayed upstream books', async ({
       html += decoder.decode(chunk.value, { stream: true });
     }
     html += decoder.decode();
-    expect(html).toContain('>Archive book 1129</a>');
+    expect(html).toContain('>Archive book 1189</a>');
     expect(await readJavaCalls(request)).toEqual([
       {
-        path: '/api/v1/books?category=Full%20shelf&page=94&size=12',
+        path: '/api/v1/books?category=Full%20shelf&page=99&size=12',
         cookie: null,
         authorization: 'Bearer fixture-service',
       },
@@ -234,8 +338,9 @@ test('streams the static shell before the delayed upstream books', async ({
   }
 });
 
-test('detail HTML and BFF reuse the same public reader cache', async ({
+test('different detail return links and BFF reuse one public book read', async ({
   request,
+  page,
 }, info) => {
   test.skip(info.project.name !== 'release');
   await setJavaScenario(request, { resetCalls: true });
@@ -245,9 +350,18 @@ test('detail HTML and BFF reuse the same public reader cache', async ({
   });
   expect(detail.status()).toBe(200);
   const { title } = await detail.json();
-  const html = await request.get('/en/books/' + id);
-  expect(html.status()).toBe(200);
-  expect(await html.text()).toContain('>' + title + '</h1>');
+  for (const query of ['?category=Programming', '?page=2']) {
+    const html = await request.get('/en/books/' + id + query);
+    expect(html.status()).toBe(200);
+    const body = await html.text();
+    expect(body).toContain('>' + title + '</h1>');
+    expect(body).toContain('href="/en/books' + query + '"');
+    // A streamed document may not be painted until the body is complete.
+    await page.goto('/en/books/' + id + query);
+    await expect(
+      page.getByRole('link', { name: 'Back to books' }),
+    ).toHaveAttribute('href', '/en/books' + query);
+  }
   expect(await readJavaCalls(request)).toEqual([
     {
       path: '/api/v1/books/' + id,

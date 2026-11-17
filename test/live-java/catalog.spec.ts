@@ -83,7 +83,12 @@ test('reads the Java v1 catalog from the production storefront and BFF', async (
     ).toBeVisible();
   }
   await page.getByRole('link', { name: book.title, exact: true }).click();
-  await expect(page).toHaveURL('/en/books/' + book.id);
+  await expect(page).toHaveURL(
+    '/en/books/' + book.id + '?category=Architecture',
+  );
+  await expect(
+    page.getByRole('link', { name: 'Back to books' }),
+  ).toHaveAttribute('href', '/en/books?category=Architecture');
   const heading = page.getByRole('heading', { name: book.title, exact: true });
   await expect(heading).toBeVisible();
   const article = page.getByRole('article').filter({ has: heading });

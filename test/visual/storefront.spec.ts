@@ -3,7 +3,9 @@ import { firstBookId } from '../support/catalog-scenario';
 
 test('desktop architecture overview', async ({ page }) => {
   await page.goto('/zh-CN');
-  await expect(page.getByRole('heading', { name: '目录练习' })).toBeVisible();
+  const main = page.getByRole('main');
+  await expect(main.getByRole('heading', { name: '各层职责' })).toBeVisible();
+  await expect(main.getByRole('region', { name: '目录练习' })).toHaveCount(0);
   await expect(page).toHaveScreenshot('overview-desktop.png');
 });
 
