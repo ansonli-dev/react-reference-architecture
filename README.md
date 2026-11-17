@@ -4,8 +4,6 @@
 
 这个教学项目以书籍目录为例。打开、筛选、翻页、查看详情这几个场景，串起了前端应用中的业务模块、服务端渲染、浏览器交互和同源 HTTP 接口。读到一个文件时，可以从路径和导入关系判断它归哪个功能、在哪个环境运行、可以依赖什么。
 
-文档结构参考 [Explicit Architecture 在线书店](https://github.com/ansonli-dev/explicit-architecture/blob/main/README-zh.md)。
-
 ## 架构演进之路
 
 ### 按业务功能组织代码
