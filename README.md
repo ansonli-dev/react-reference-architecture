@@ -34,7 +34,8 @@ pnpm start   # 启动生产构建
 
 - [建设指导书](docs/project-guide.md)：目标、技术分工、总体架构与建设路线。
 - [ADR 0001](docs/adr/0001-application-baseline.md)：初始工程决策及版本兼容性。
-- [初始化计划](docs/superpowers/plans/2026-10-30-initialize-project.md)：本次范围与验证状态。
+- [Superpowers 设计与实施计划](docs/superpowers/README.md)：业务纵切、Java 联调、验证步骤和评审记录。
+- [初始化计划](docs/superpowers/plans/2026-10-30-initialize-project.md)：初始工程范围与验证状态。
 - [Agent 工作指引](AGENTS.md)。
 
 ## 后续路线
