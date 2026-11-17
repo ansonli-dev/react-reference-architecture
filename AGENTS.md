@@ -1,6 +1,6 @@
 # Agent 工作指引
 
-1. 开始前阅读 `docs/project-guide.md`、`README.md` 及相关 `docs/adr/` 决策。
+1. 开始前阅读 `README.md`、`docs/architecture/overview.md`、`docs/architecture/architecture-spec.md` 及相关 `docs/adr/` 决策。
 2. 项目是现代 React 应用架构参考实现；以在线书店贯穿服务端、客户端和 BFF，不扩展为组件 API 课程。
 3. 路由入口保持薄层；业务按 feature 组织。服务端秘密、会话与后端适配器必须使用 server-only，不能进入客户端依赖链。
 4. 明确区分服务端页面数据、Query 缓存、Zustand 草稿、表单与 URL 状态。禁止跨请求共享用户状态。
