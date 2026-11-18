@@ -31,6 +31,8 @@
 
 故障日志中 `event=catalog.read_failed` 记录固定的目录入口、请求 ID、分类状态与耗时。用 BFF 响应里的 `error.requestId` 搜索同一个 ID；页面降级事件按入口和时间定位。页面日志的 `status` 是分类状态，流式 HTML 可能已经发出 200。运行时凭据不进入这些记录。
 
+报价与提交资源的 5xx 会记录 `event=checkout.request_failed`。用 BFF 响应的 `error.requestId` 关联操作名、错误码、HTTP 状态和耗时。[结算关联测试](../../test/unit/checkout-observability.test.ts)
+
 ## Java 集成
 
 本地联调可用 Java 仓库的 `demo/compose.yaml` 和 `demo/compose.frontend.yaml` 启动完整环境。后端 `demo/README.md` 记录启动步骤。[Java 仓库](https://github.com/ansonli-dev/explicit-architecture) · [Java OpenAPI 契约](../../contracts/java/README.md) · [真实 Java 与 Keycloak 验证](../testing-strategy/README.md#真实-java-与-keycloak-联调)

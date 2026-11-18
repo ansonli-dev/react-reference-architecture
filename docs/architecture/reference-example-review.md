@@ -47,10 +47,10 @@
 
 ## 已记录的工程改进
 
-1. **结算 401 后恢复原报价。** 本地 Demo 生产构建分别模拟提交和轮询返回 `401`，两种情况都丢失了 URL 中的 `quote`，并显示了 `Checkout.notices.signIn`。为重新登录提供双语提示，通过现有回跳机制恢复原报价，并沿用原幂等键查询或继续确认。双语词典对齐测试还需检查业务提示枚举中的每个键。[结算表单](../../src/features/checkout/ui/checkout-form.tsx#L193) · [登录回跳](../../src/app/%5Blocale%5D/checkout-sign-in.tsx#L25) · [词典测试](../../test/integration/translations.test.ts#L13)
+1. **结算 401 后恢复原报价。** 本地 Demo 生产构建分别模拟提交和轮询返回 `401`，两种情况都丢失了 URL 中的 `quote`，并显示了 `Checkout.notices.signIn`。为重新登录提供双语提示，通过现有回跳机制恢复原报价，并沿用原幂等键查询或继续确认。双语词典对齐测试还需检查业务提示枚举中的每个键。[结算表单](../../src/features/checkout/ui/checkout-form.tsx#L146) · [登录回跳](../../src/app/%5Blocale%5D/checkout-sign-in.tsx#L25) · [词典测试](../../test/integration/translations.test.ts#L13)
 2. **让结算请求使用已有的 OpenAPI 客户端。** `CheckoutForm` 现在同时实现 HTTP 请求、响应解析、重试和导航。优先从报价、提交和状态查询抽出 feature 请求声明，用生成类型检查请求契约，用 Zod 校验会影响流程的响应内容。[结算表单](../../src/features/checkout/ui/checkout-form.tsx#L26) · [类型客户端](../../src/shared/api/client.ts#L1)
 3. **补异步结算失败与恢复的 CI 证据。** 普通 CI 的 Demo 用例将已落单的响应改成 `202`，覆盖轮询成功。独立 Java 联调已覆盖响应丢失后重试。优先补普通 CI 的会话过期、轮询未收敛或响应丢失等可控场景，并用独立联调验证实际依赖协作。[Demo 浏览器用例](../../test/e2e/bookstore-checkout.spec.ts#L153) · [Java 联调](../../test/live-java/checkout.spec.ts#L444) · [CI](../../.github/workflows/ci.yml#L30)
-4. **按职责拆购物车和订单视图。** 购物车路由文件同时承载数据读取、币种分组展示和报价确认。把能独立描述、一起变化的结算视图作为提取候选，按需在应用层组合书封等目录能力。通用 `CatalogNotice` 可移到 `shared/ui`，由调用方传入文案与操作。[购物车页](<../../src/app/%5Blocale%5D/(store)/cart/page.tsx#L143>) · [订单页](<../../src/app/%5Blocale%5D/(store)/orders/page.tsx#L50>) · [提示组件](../../src/features/catalog/ui/catalog-notice.tsx#L1)
+4. **按职责拆购物车和订单视图。** 评审时购物车路由同时承载数据读取、币种分组展示和报价确认。把能独立描述、一起变化的结算视图作为提取候选，按需在应用层组合书封等目录能力。通用提示可由 `shared/ui` 提供，调用方传入文案与操作。[结算服务端入口](../../src/features/checkout/server.ts) · [共享提示](../../src/shared/ui/action-notice.tsx)
 5. **用 `requestId` 关联结算故障。** 目录已有 5xx 结构化日志。可将结算操作名、错误码、耗时和响应中的 `requestId` 一起写入日志，以便定位报价、提交和轮询失败。[结算错误处理](../../src/server/http/checkout.server.ts#L11) · [目录日志](../../src/server/observability/catalog.server.ts#L10)
 
 基线的静态检查、OpenAPI 生成检查、116 个单元与集成测试、两种生产构建、4 个现有 Demo 结算用例均通过。两种 `401` 情况已通过本地模拟响应复现。基线核验未运行连接真实 Java／Keycloak 的联调。

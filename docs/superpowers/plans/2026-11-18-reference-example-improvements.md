@@ -30,7 +30,7 @@
 ### Task 3 验证异步处理、丢响应和版本清理
 
 - [ ] 扩充 `test/e2e/bookstore-checkout.spec.ts`。持续 `PROCESSING` 用例验证轮询耗尽后提示处理中并保留报价，初始 `RECONCILE_REQUIRED` 用例验证提示待核对、保留报价且自动轮询次数为零。两个场景手动继续时都沿用原幂等键。丢响应场景让 Demo 真实落单，再丢弃浏览器响应，重试核对订单 ID、库存和幂等键。复用普通 CI 与 SQLite 种子。在 `test/integration/demo-checkout.test.ts` 复用隔离数据库内的报价过期设置，验证已受理提交在报价到期后仍可重放。
-- [ ] 在 `test/live-java/checkout.spec.ts` 用可控的操作 401 验证真实登录回跳。确认同一个 BFF 会话能读购物车和报价，仍有明确登录动作。核对实际进入 Keycloak、回到同一报价、由用户手动提交并复用原幂等键。留出一个未受理过的真实提交，核对 Java 初始 202 与 `PROCESSING`、准确的 `Location` 和浏览器对该地址的查询。
+- [ ] 在 `test/live-java/checkout.spec.ts` 用可控的操作 401 验证真实登录回跳。确认同一个 BFF 会话能读购物车和报价，仍有明确登录动作。核对实际进入 Keycloak、回到同一报价、由用户手动提交并复用原幂等键。第一次向真实 Java 发出提交时，核对浏览器收到的 BFF 202 与 `PROCESSING`、准确的 `Location` 和对该地址的查询。
 - [ ] 在 `test/live-java/checkout.spec.ts` 增加同账户的版本清理用例。报价包含两行，在报价后修改其中一行。原报价提交成功后，未修改的行被清理，修改过的行及其新版本保留。用同一幂等键重放，确认新行仍在且订单只有一笔。
 - [ ] 在已有联调环境执行 Release 用例时，记录实际通过的前后端提交、种子条件与联调结果。环境缺失时，在案例证据中标记待联调。
 

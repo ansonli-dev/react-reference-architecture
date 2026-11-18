@@ -74,4 +74,4 @@ bash scripts/test-visual.sh
 
 ### 真实 Java 与 Keycloak 联调
 
-连接带隔离种子数据的 Java 联调环境后执行 `pnpm test:e2e:java`。这套用例覆盖 Keycloak 登录、邮件验证及密码重置、账户购物车草稿在 PostgreSQL 中的恢复，以及 Java Order 的下单、丢响应重试和两位账户争购最后一本。[Java 集成启动](../operations/run-and-release.md#java-集成) · [浏览器用例](../../test/live-java/checkout.spec.ts)
+连接带隔离种子数据的 Java 联调环境后执行 `pnpm test:e2e:java`。这套用例覆盖 Keycloak 登录、邮件验证及密码重置、账户购物车草稿在 PostgreSQL 中的恢复，以及 Java Order 的下单、丢响应重试和两位账户争购最后一本。结算恢复用例模拟一次操作 401，断言原会话还可读报价，并经过真实的 Keycloak 登录回跳再下单。版本清理用例核对同一账户报价之后修改的购物车条目在下单成功和重放后都保留。[Java 集成启动](../operations/run-and-release.md#java-集成) · [浏览器用例](../../test/live-java/checkout.spec.ts)
