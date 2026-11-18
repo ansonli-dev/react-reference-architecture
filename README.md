@@ -5,7 +5,7 @@
 ## 架构案例
 
 - **首屏读取与独立 HTTP 调用。** 目录页在 RSC 中读取数据，HTTP 调用方通过 Route Handler 读取 JSON。两个入口共用服务端读取器。[案例说明](docs/architecture/overview.md#页面首屏与独立-http-调用) · [目录页](<src/app/%5Blocale%5D/(store)/books/page.tsx>) · [目录接口](src/app/api/v1/catalog/books/route.ts) · [书目一致用例](test/e2e/catalog-journey.spec.ts#L53) · [流式外壳用例](test/e2e/catalog-journey.spec.ts#L279)
-- **筛选、表单与交易状态放在哪里？** 已提交的筛选在 URL，未提交的输入在表单，购物车与报价由服务端按会话读取。[案例说明](docs/architecture/overview.md#渲染与状态归属) · [筛选表单](src/features/catalog/ui/catalog-filters.tsx) · [报价确认入口](<src/app/%5Blocale%5D/(store)/cart/page.tsx>) · [筛选导航用例](test/e2e/catalog-journey.spec.ts#L69) · [报价刷新用例](test/e2e/bookstore-checkout.spec.ts#L146) · [交易资源隔离用例](test/e2e/bookstore-checkout-http.spec.ts#L129)
+- **筛选、表单与交易状态放在哪里？** 已提交的筛选在 URL，未提交的输入在表单，购物车与报价由服务端按会话读取。[案例说明](docs/architecture/overview.md#渲染与状态归属) · [筛选表单](src/features/catalog/ui/catalog-filters.tsx) · [报价确认入口](<src/app/%5Blocale%5D/(store)/cart/page.tsx>) · [筛选导航用例](test/e2e/catalog-journey.spec.ts#L69) · [报价刷新用例](test/e2e/bookstore-checkout.spec.ts#L210) · [交易资源隔离用例](test/e2e/bookstore-checkout-http.spec.ts#L129)
 - **并发写入与异步结算。** 购物车用版本保护写入，报价固定交易输入，提交可用同一个幂等键重试并单独查询状态。[案例说明](docs/architecture/overview.md#并发写入与异步结算) · [条目接口](src/app/api/v1/cart/items/%5BbookId%5D/route.ts) · [提交接口](src/app/api/v1/order-submissions/route.ts) · [购物车冲突与结算用例](test/e2e/bookstore-checkout.spec.ts)
 
 ## 本地启动

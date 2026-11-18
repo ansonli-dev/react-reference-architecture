@@ -56,8 +56,8 @@ flowchart LR
 
 不同标签页可能同时写购物车，订单写入后浏览器也可能收不到提交响应。条目的 `ETag` 表示当前版本，`If-Match` 带回该版本。收到 `412` 时，页面提示核对最新数量。报价固定此次交易输入，提交使用报价 ID 作为稳定的幂等键，响应的 `Location` 指向可独立查询的提交资源。[条目接口](../../src/app/api/v1/cart/items/%5BbookId%5D/route.ts) · [提交接口](../../src/app/api/v1/order-submissions/route.ts) · [跨标签页冲突用例](../../test/e2e/bookstore-checkout.spec.ts#L62) · [幂等重放用例](../../test/e2e/bookstore-checkout-http.spec.ts)
 
-Release 的 `202` 表示提交已受理，结果仍待确认。只有 `PROCESSING` 触发有限轮询，`RECONCILE_REQUIRED` 提示等待核对并可手动重查。成功以 `PLACED` 且有订单 ID 为准。Demo 的浏览器用例用模拟的 `202` 验证轮询，实际订单由 SQLite 同步提交。[结算交互](../../src/features/checkout/ui/checkout-form.tsx) · [Demo 模拟轮询用例](../../test/e2e/bookstore-checkout.spec.ts#L153) · [真实 Java 支撑的 BFF 用例](../../test/live-java/checkout.spec.ts#L437)
+Release 的 `202` 表示提交已受理，结果仍待确认。只有 `PROCESSING` 触发有限轮询，`RECONCILE_REQUIRED` 提示等待核对并可手动重查。成功以 `PLACED` 且有订单 ID 为准。Demo 的浏览器用例用模拟的 `202` 验证轮询，实际订单由 SQLite 同步提交。[结算交互](../../src/features/checkout/ui/checkout-form.tsx) · [Demo 模拟轮询用例](../../test/e2e/bookstore-checkout.spec.ts#L215) · [真实 Java 支撑的 BFF 用例](../../test/live-java/checkout.spec.ts#L437)
 
-提交或轮询失去认证时保留报价 ID。Release 让用户重新登录并回到原报价，再用同一幂等键手动继续确认。已经受理的提交可以在报价到期后重放。联调用例只模拟触发恢复的操作 401，随后走真实 Keycloak 回跳和 Java 下单。[登录恢复用例](../../test/live-java/checkout.spec.ts#L437) · [报价到期后重放用例](../../test/integration/demo-checkout.test.ts#L85)
+提交或轮询失去认证时保留报价 ID。Release 让用户重新登录并回到原报价，再用同一幂等键手动继续确认。已经受理的提交可以在报价到期后重放。联调用例只模拟触发恢复的操作 401，随后走真实 Keycloak 回跳和 Java 下单。[登录恢复用例](../../test/live-java/checkout.spec.ts#L437) · [报价到期后重放用例](../../test/integration/demo-checkout.test.ts#L118)
 
 仅由本站表单发起且无需独立 HTTP 契约的单次写入可用 Server Action。书店用同源 BFF 表达版本冲突、幂等重放和提交状态查询。[BFF 契约](../../contracts/bff/v1.yaml)

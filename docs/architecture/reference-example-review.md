@@ -24,7 +24,7 @@
 
 ### 同一个目录适配两种数据源，按新鲜度选择缓存
 
-`CatalogPort` 有 SQLite 和 Java HTTP 两个实际实现，目录页面与 BFF 继续使用相同的查询和返回模型。可重复的公开读取才值得复用缓存，缓存收益取决于查询是否集中、业务能否容忍短暂陈旧和写入后是否能失效。Demo 缓存符合条件的公开列表和详情，成交时使库存缓存失效。Release 每次向 Java 读取，以便下一次请求看到库存变化。私有结算 HTTP 响应使用 `no-store`。[目录接口](../../src/features/catalog/server.ts#L4) · [缓存 ADR](../adr/0002-public-reads-and-cache.md) · [Demo 成交后库存用例](../../test/e2e/bookstore-checkout.spec.ts#L211) · [Release 库存用例](../../test/e2e/catalog-http.spec.ts#L154)
+`CatalogPort` 有 SQLite 和 Java HTTP 两个实际实现，目录页面与 BFF 继续使用相同的查询和返回模型。可重复的公开读取才值得复用缓存，缓存收益取决于查询是否集中、业务能否容忍短暂陈旧和写入后是否能失效。Demo 缓存符合条件的公开列表和详情，成交时使库存缓存失效。Release 每次向 Java 读取，以便下一次请求看到库存变化。私有结算 HTTP 响应使用 `no-store`。[目录接口](../../src/features/catalog/server.ts#L4) · [缓存 ADR](../adr/0002-public-reads-and-cache.md) · [Demo 成交后库存用例](../../test/e2e/bookstore-checkout.spec.ts#L273) · [Release 库存用例](../../test/e2e/catalog-http.spec.ts#L154)
 
 仅有一种数据源时，直接读取通常更简单。希望同一应用独立演示并接入真实后端时，适配接口有明确用途。两种模式共用页面和 BFF 资源，仍有业务差异。Demo 按浏览器会话和币种在 SQLite 内同步结算，Release 按账户保存购物车，由 Java Order 处理人民币报价和可能异步的提交。案例旁适合标明其所属模式和依赖。[运行模式](../operations/run-and-release.md) · [Java 购物车适配器](../../src/server/adapters/java/cart.server.ts#L194)
 
@@ -34,8 +34,8 @@
 
 ## 示例的验证范围
 
-- **Demo 可证明单库交易与浏览器流程。** 普通 CI 有 SQLite 交易测试、购物车版本冲突、双语购书以及同一报价幂等重放。模拟的 `202` 用例覆盖浏览器轮询到成功，底层订单由 Demo 同步创建。[Demo HTTP 用例](../../test/e2e/bookstore-checkout-http.spec.ts#L9) · [轮询用例](../../test/e2e/bookstore-checkout.spec.ts#L153) · [SQLite 交易用例](../../test/integration/demo-checkout.test.ts#L85)
-- **Release 普通 CI 用目录替身验证发布产物的目录和匿名访问边界。** 现有 `/api/ready` 表示运行配置可解析且目录可读。真实账户登录、邮件、PostgreSQL 草稿与 Java Order 的协作有独立联调用例。运行说明适合就近链接这些用例，记录通过验证的前后端版本和测试数据条件。[CI](../../.github/workflows/ci.yml#L30) · [镜像烟测](../../scripts/test-release.sh#L93) · [真实 Java 用例](../../test/live-java/checkout.spec.ts#L234) · [联调前提](../operations/run-and-release.md#java-集成)
+- **Demo 可证明单库交易与浏览器流程。** 普通 CI 有 SQLite 交易测试、购物车版本冲突、双语购书以及同一报价幂等重放。模拟的 `202` 用例覆盖浏览器轮询到成功，底层订单由 Demo 同步创建。[Demo HTTP 用例](../../test/e2e/bookstore-checkout-http.spec.ts#L9) · [轮询用例](../../test/e2e/bookstore-checkout.spec.ts#L215) · [SQLite 交易用例](../../test/integration/demo-checkout.test.ts#L97)
+- **Release 普通 CI 用目录替身验证发布产物的目录和匿名访问边界。** 现有 `/api/ready` 表示运行配置可解析且目录可读。真实账户登录、邮件、PostgreSQL 草稿与 Java Order 的协作有独立联调用例。运行说明适合就近链接这些用例，记录通过验证的前后端版本和测试数据条件。[CI](../../.github/workflows/ci.yml#L30) · [镜像烟测](../../scripts/test-release.sh#L93) · [真实 Java 用例](../../test/live-java/checkout.spec.ts#L285) · [联调前提](../operations/run-and-release.md#java-集成)
 - **两项表述值得收紧。** 组合 ADR 目前写着生产用例验证了页面和 HTTP 的热读缓存复用。现有用例比较书目，带上游调用次数的断言验证的是 Release 每次重新读取 Java。可将 ADR 改为这两项已验证的事实；如果要把 Demo 跨入口命中作为案例证据，需要观测同查询的实际读取次数。首次跨标签加购也应注明 Web Locks 的适用条件。[组合 ADR](../adr/0003-frontend-module-composition.md#取舍与证据) · [Release 读取次数用例](../../test/e2e/catalog-journey.spec.ts#L322) · [本地购书接口说明](architecture-spec.md#本地购书接口)
 - **Release 的版本清理值得补一条直接证据。** 报价后同一账户如果修改某个条目，订单成功只应清理仍匹配报价版本的行。Java 适配器已经按版本删除。现有联调覆盖丢响应重试与两账户争购，建议再断言同账户修改后的新行在成功和重放时都保留。[版本清理实现](../../src/server/adapters/java/cart.server.ts#L140) · [Java 结算 ADR](../adr/0004-java-integrated-checkout.md) · [已有联调用例](../../test/live-java/checkout.spec.ts#L569)
 
@@ -49,7 +49,7 @@
 
 1. **结算 401 后恢复原报价。** 本地 Demo 生产构建分别模拟提交和轮询返回 `401`，两种情况都丢失了 URL 中的 `quote`，并显示了 `Checkout.notices.signIn`。为重新登录提供双语提示，通过现有回跳机制恢复原报价，并沿用原幂等键查询或继续确认。双语词典对齐测试还需检查业务提示枚举中的每个键。[结算表单](../../src/features/checkout/ui/checkout-form.tsx#L146) · [登录回跳](../../src/app/%5Blocale%5D/checkout-sign-in.tsx#L25) · [词典测试](../../test/integration/translations.test.ts#L13)
 2. **让结算请求使用已有的 OpenAPI 客户端。** `CheckoutForm` 现在同时实现 HTTP 请求、响应解析、重试和导航。优先从报价、提交和状态查询抽出 feature 请求声明，用生成类型检查请求契约，用 Zod 校验会影响流程的响应内容。[结算表单](../../src/features/checkout/ui/checkout-form.tsx#L26) · [类型客户端](../../src/shared/api/client.ts#L1)
-3. **补异步结算失败与恢复的 CI 证据。** 普通 CI 的 Demo 用例将已落单的响应改成 `202`，覆盖轮询成功。独立 Java 联调已覆盖响应丢失后重试。优先补普通 CI 的会话过期、轮询未收敛或响应丢失等可控场景，并用独立联调验证实际依赖协作。[Demo 浏览器用例](../../test/e2e/bookstore-checkout.spec.ts#L153) · [Java 联调](../../test/live-java/checkout.spec.ts#L569) · [CI](../../.github/workflows/ci.yml#L30)
+3. **补异步结算失败与恢复的 CI 证据。** 普通 CI 的 Demo 用例将已落单的响应改成 `202`，覆盖轮询成功。独立 Java 联调已覆盖响应丢失后重试。优先补普通 CI 的会话过期、轮询未收敛或响应丢失等可控场景，并用独立联调验证实际依赖协作。[Demo 浏览器用例](../../test/e2e/bookstore-checkout.spec.ts#L215) · [Java 联调](../../test/live-java/checkout.spec.ts#L569) · [CI](../../.github/workflows/ci.yml#L30)
 4. **按职责拆购物车和订单视图。** 评审时购物车路由同时承载数据读取、币种分组展示和报价确认。把能独立描述、一起变化的结算视图作为提取候选，按需在应用层组合书封等目录能力。通用提示可由 `shared/ui` 提供，调用方传入文案与操作。[结算服务端入口](../../src/features/checkout/server.ts) · [共享提示](../../src/shared/ui/action-notice.tsx)
 5. **用 `requestId` 关联结算故障。** 目录已有 5xx 结构化日志。可将结算操作名、错误码、耗时和响应中的 `requestId` 一起写入日志，以便定位报价、提交和轮询失败。[结算错误处理](../../src/server/http/checkout.server.ts#L11) · [目录日志](../../src/server/observability/catalog.server.ts#L10)
 
