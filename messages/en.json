@@ -12,6 +12,8 @@
     "notFound": "Page not found",
     "backToCatalog": "Back to books",
     "signIn": "Sign in",
+    "register": "Create account",
+    "account": "My account",
     "signOut": "Sign out"
   },
   "Catalog": {
@@ -88,10 +90,15 @@
       "conflict": "This submission conflicts with an existing record. Review a new quote.",
       "processing": "Your order is processing. Submit the same quote to check its status.",
       "reconcile": "Your order is under review. Submit the same quote to check its status.",
-      "signIn": "Sign in to use your cart and orders.",
       "email": "Verify your account email before requesting a quote.",
       "intake": "The bookstore is temporarily pausing checkout. Your cart is saved.",
       "currency": "Checkout currently supports CNY prices."
+    },
+    "auth": {
+      "add": "Sign in to add this book to your cart.",
+      "cart": "Sign in to view your saved cart.",
+      "orders": "Sign in to view your order history.",
+      "continue": "Sign in to continue"
     },
     "placeLiveOrder": "Place order",
     "pagination": "Order history pagination",

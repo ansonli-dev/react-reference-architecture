@@ -2,7 +2,7 @@ import { NextRequest } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   finishJavaLogin,
-  javaLoginHref,
+  javaAuthHref,
   logoutJavaSession,
   readJavaSession,
   startJavaLogin,
@@ -27,13 +27,13 @@ function configureRelease() {
 
 afterEach(() => vi.unstubAllEnvs());
 
-describe('Keycloak login links', () => {
+describe.each(['signin', 'register'] as const)('Keycloak %s links', (flow) => {
   it.each([
     '/en/cart?limit=3#confirmation',
     '/zh-CN/books?q=boundary%20design',
   ])('preserves a localized return path %s', (path) => {
-    const href = new URL(javaLoginHref(path), origin);
-    expect(href.pathname).toBe('/api/auth/signin/keycloak');
+    const href = new URL(javaAuthHref(path, flow), origin);
+    expect(href.pathname).toBe('/api/auth/' + flow + '/keycloak');
     expect(href.searchParams.get('returnTo')).toBe(path);
   });
 
@@ -43,19 +43,23 @@ describe('Keycloak login links', () => {
     '/\\external.test/en/books',
     '/en/%2e%2e/api/auth/signin/keycloak',
   ])('replaces a return path outside the storefront %s', (path) => {
-    const href = new URL(javaLoginHref(path), origin);
+    const href = new URL(javaAuthHref(path, flow), origin);
     expect(href.searchParams.get('returnTo')).toBe('/zh-CN/books');
   });
 });
 
-it('keeps the Keycloak entry point disabled in demo', async () => {
-  vi.stubEnv('BOOKSTORE_BUILD_PROFILE', 'demo');
-  const result = await startJavaLogin(
-    new NextRequest(origin + '/api/auth/signin/keycloak'),
-  );
-  expect(result.status).toBe(404);
-  expect(result.headers.has('set-cookie')).toBe(false);
-});
+it.each(['signin', 'register'] as const)(
+  'keeps the Keycloak %s entry point disabled in demo',
+  async (flow) => {
+    vi.stubEnv('BOOKSTORE_BUILD_PROFILE', 'demo');
+    const result = await startJavaLogin(
+      new NextRequest(origin + '/api/auth/' + flow + '/keycloak'),
+      flow,
+    );
+    expect(result.status).toBe(404);
+    expect(result.headers.has('set-cookie')).toBe(false);
+  },
+);
 
 it('renders an unconfigured release shell without a session', async () => {
   configureRelease();

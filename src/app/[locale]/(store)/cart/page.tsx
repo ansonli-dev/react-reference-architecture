@@ -81,7 +81,9 @@ async function CartContent({
   } catch (error) {
     if (!(error instanceof ApiFailure)) throw error;
     if (error.code === 'UNAUTHENTICATED')
-      return <CheckoutSignIn locale={locale} returnTo={returnTo} />;
+      return (
+        <CheckoutSignIn locale={locale} returnTo={returnTo} intent="cart" />
+      );
     return (
       <CatalogNotice
         message={t('notices.unavailable')}

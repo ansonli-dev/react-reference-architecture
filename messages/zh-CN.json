@@ -12,6 +12,8 @@
     "notFound": "找不到这个页面",
     "backToCatalog": "返回目录",
     "signIn": "登录",
+    "register": "创建账号",
+    "account": "我的账号",
     "signOut": "退出登录"
   },
   "Catalog": {
@@ -88,10 +90,15 @@
       "conflict": "本次提交与已有记录冲突，请重新核对报价。",
       "processing": "订单仍在处理。可再次提交同一报价查询结果。",
       "reconcile": "订单结果待核对。可再次提交同一报价查询结果。",
-      "signIn": "登录后即可使用购物车并查看订单。",
       "email": "核对报价前，请先验证账户邮箱。",
       "intake": "书店暂时暂停结算，购物车已保存。",
       "currency": "结算目前仅支持人民币。"
+    },
+    "auth": {
+      "add": "登录后可将这本书加入购物车。",
+      "cart": "登录后可查看已保存的购物车。",
+      "orders": "登录后可查看你的订单记录。",
+      "continue": "登录并继续"
     },
     "placeLiveOrder": "提交订单",
     "pagination": "订单分页",

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 import {
   expect,
   test,
@@ -77,9 +78,7 @@ async function signIn(page: Page, reader: Reader) {
   await expect(page).toHaveURL(
     new URL('/en/books', 'http://localhost:3000').href,
   );
-  await expect(
-    page.getByRole('button', { name: 'Sign out', exact: true }),
-  ).toBeVisible();
+  await expect(page.getByText('My account', { exact: true })).toBeVisible();
 }
 
 async function readStock(page: Page, book: SeedBook) {
@@ -202,6 +201,188 @@ async function orderHistory(page: Page) {
   return history;
 }
 
+async function mailAction(
+  request: APIRequestContext,
+  email: string,
+  subject: string,
+) {
+  const inbox = 'http://localhost:8025/api/v1';
+  const search =
+    inbox + '/search?' + new URLSearchParams({ query: 'to:' + email });
+  let messageId: string | undefined;
+  await expect
+    .poll(async () => {
+      const { messages } = await read<{
+        messages: { ID: string; Subject: string }[];
+      }>(request, search);
+      messageId = messages.find((message) => message.Subject === subject)?.ID;
+      return messageId;
+    }, settled)
+    .toBeTruthy();
+  const { Text } = await read<{ Text: string }>(
+    request,
+    inbox + '/message/' + messageId,
+  );
+  const link = Text.match(
+    /https?:\/\/\S+\/login-actions\/action-token\?\S+/,
+  )?.[0];
+  assert(link, 'Missing Keycloak email action link');
+  expect(new URL(link).origin).toBe(new URL(keycloak).origin);
+  return link;
+}
+
+test('signs in with an email and returns to the filtered catalog', async ({
+  page,
+}) => {
+  const destination = '/en/books?q=Bounded+Contexts';
+  await page.goto(destination);
+  const nav = page.getByRole('navigation', { name: 'Main navigation' });
+  await nav.getByRole('link', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveTitle('Between Pages | Account');
+  await expect(
+    page.getByRole('heading', { name: 'Sign in', exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Create account' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Forgot password?' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Back to bookstore' }),
+  ).toHaveAttribute('href', 'http://localhost:3000/en/books');
+
+  await page.getByLabel('Email or username').fill('reader-b@example.test');
+  const password = page.locator('#password');
+  await expect(password).toHaveAttribute('autocomplete', 'current-password');
+  await password.fill('reader-b-local');
+  await page.getByRole('button', { name: 'Show password' }).click();
+  await expect(password).toHaveAttribute('type', 'text');
+  await page.getByRole('button', { name: 'Hide password' }).click();
+  await expect(password).toHaveAttribute('type', 'password');
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click();
+  await expect(page).toHaveURL(destination);
+  await expect(
+    page.getByRole('searchbox', { name: 'Search books' }),
+  ).toHaveValue('Bounded Contexts');
+
+  const account = nav.locator('summary').filter({ hasText: 'My account' });
+  const ordersLink = nav.getByRole('link', { name: 'Orders', exact: true });
+  await account.focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  await expect(ordersLink).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(account).toBeFocused();
+  await expect(ordersLink).toHaveCount(0);
+});
+
+test('registers a reader and restores their cart and orders after a password reset', async ({
+  page,
+  request,
+}) => {
+  const username = 'reader-' + randomUUID();
+  const email = username + '@example.test';
+  const password = randomUUID() + '!a7';
+  const nav = page.getByRole('navigation', { name: 'Main navigation' });
+  const cart = nav.getByRole('link', { name: 'Cart', exact: true });
+  const orderList = nav.getByRole('link', { name: 'Orders', exact: true });
+  const account = nav.locator('summary').filter({ hasText: 'My account' });
+  const signInLink = nav.getByRole('link', { name: 'Sign in', exact: true });
+  const detail = '/en/books/' + boundedContexts.id;
+
+  await page.goto(detail);
+  await expect(signInLink).toBeVisible();
+  await expect(cart).toHaveCount(0);
+  await expect(orderList).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Add to cart' })).toHaveCount(
+    0,
+  );
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: 'Create account' })
+    .click();
+  await page.locator('#firstName').fill('New');
+  await page.locator('#lastName').fill('Reader');
+  await page.locator('#email').fill(email);
+  await page.locator('#username').fill(username);
+  await page.locator('#password').fill(password);
+  await page.locator('#password-confirm').fill(password);
+  await page
+    .getByRole('button', { name: 'Create account', exact: true })
+    .click();
+
+  await page.goto(await mailAction(request, email, 'Verify email'));
+  await expect(page).toHaveURL(detail);
+
+  await expect(signInLink).toHaveCount(0);
+  await expect(cart).toBeVisible();
+  await account.click();
+  await expect(orderList).toBeVisible();
+  await account.click();
+  await expect(await orderHistory(page)).toEqual([]);
+  await page.getByRole('button', { name: 'Add to cart', exact: true }).click();
+  await expect(page).toHaveURL('/en/cart');
+  await createQuote(page, boundedContexts, 1);
+  accepted(await place(page));
+  const orderId = await receiptId(page);
+
+  await nav.getByRole('link', { name: 'Book catalog', exact: true }).click();
+  await addBook(page, transactions);
+  await account.click();
+  await nav.getByRole('button', { name: 'Sign out' }).click();
+  await expect(page).toHaveURL('/en/books');
+  await expect(signInLink).toBeVisible();
+  await expect(cart).toHaveCount(0);
+  await expect(orderList).toHaveCount(0);
+  await page.goto('/en/cart');
+  await expect(
+    page.getByText('Sign in to view your saved cart.'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: transactions.title }),
+  ).toHaveCount(0);
+  await page.goto('/en/orders');
+  await expect(
+    page.getByText('Sign in to view your order history.'),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Order ' + orderId }),
+  ).toHaveCount(0);
+  for (const path of ['/api/v1/cart', orders, orders + '/' + orderId]) {
+    expect((await page.request.get(path)).status()).toBe(401);
+  }
+
+  // Recover from a browser that does not remember the Keycloak account.
+  await page.context().clearCookies();
+  await page
+    .getByRole('main')
+    .getByRole('link', { name: 'Sign in to continue' })
+    .click();
+  await expect(page.locator('#password')).toBeVisible();
+  await page.getByRole('link', { name: 'Forgot password?' }).click();
+  await expect(
+    page.getByRole('heading', { name: 'Reset your password' }),
+  ).toBeVisible();
+  await page.locator('#username').fill(email);
+  await page.locator('#kc-form-buttons').click();
+  await page.goto(await mailAction(request, email, 'Reset password'));
+  const newPassword = randomUUID() + '!a7';
+  await page.locator('#password-new').fill(newPassword);
+  await page.locator('#password-confirm').fill(newPassword);
+  await page.locator('#kc-submit').click();
+  await expect(page).toHaveURL('/en/orders');
+  await expect(
+    page.getByRole('heading', { name: 'Order ' + orderId }),
+  ).toBeVisible();
+  await cart.click();
+  await expect(page).toHaveURL('/en/cart');
+  await expect(
+    page.getByRole('link', { name: transactions.title }),
+  ).toBeVisible();
+  await expect(quantityInput(page)).toHaveValue('1');
+});
+
 test('checks out through Keycloak and reloads the same order from storefront navigation', async ({
   page,
 }) => {
@@ -234,10 +415,9 @@ test('checks out through Keycloak and reloads the same order from storefront nav
   expect(createdAt).toBeGreaterThanOrEqual(beforeSubmit - 1_000);
   expect(createdAt).toBeLessThanOrEqual(Date.now() + 1_000);
 
-  await page
-    .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('link', { name: 'Orders', exact: true })
-    .click();
+  const nav = page.getByRole('navigation', { name: 'Main navigation' });
+  await nav.locator('summary').filter({ hasText: 'My account' }).click();
+  await nav.getByRole('link', { name: 'Orders', exact: true }).click();
   await expect(page).toHaveURL('/en/orders');
   await page.reload();
   const receipt = page.getByRole('listitem').filter({

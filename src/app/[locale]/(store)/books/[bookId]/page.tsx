@@ -140,6 +140,7 @@ async function BookDetails({ params, searchParams }: DetailsProps) {
               <CheckoutSignIn
                 locale={locale}
                 returnTo={catalogHref(base + '/' + id, sourceQuery)}
+                intent="add"
               />
             )}
             {!signInToBuy && (
