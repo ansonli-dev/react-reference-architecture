@@ -1,9 +1,7 @@
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
 import { http, HttpResponse } from 'msw';
-import { createJavaCatalogV2 } from '@/server/adapters/java/catalog-v2.server';
-import { createJavaOrderV2 } from '@/server/adapters/java/order-v2.server';
+import { createJavaOrder } from '@/server/adapters/java/order-v1.server';
 import { mockServer } from '../mocks/server';
-import { examples } from '../../contracts/java/order-v2-responses.json';
 
 const origin = 'http://java.example.test';
 const bookId = '00000000-0000-4000-8000-000000000101';
@@ -11,61 +9,41 @@ const quoteId = '00000000-0000-4000-8000-000000000102';
 const submissionId = '00000000-0000-4000-8000-000000000103';
 const orderId = '00000000-0000-4000-8000-000000000104';
 const createdAt = '2026-11-18T01:02:03Z';
-const catalog = createJavaCatalogV2(origin);
-const checkout = createJavaOrderV2(origin, 'customer-access-token');
+const checkout = createJavaOrder(origin, 'customer-access-token');
 
 beforeAll(() => mockServer.listen({ onUnhandledFrame: 'error' }));
 afterEach(() => mockServer.resetHandlers());
 afterAll(() => mockServer.close());
 
-it('sends a public one-based keyword query and keeps upstream pagination', async () => {
+it('replays the same quote using the customer token and idempotency key', async () => {
+  const placed = {
+    submissionId,
+    state: 'PLACED',
+    order: {
+      orderId,
+      totalMinor: 5500,
+      currency: 'CNY',
+      status: 'PLACED',
+      createdAt,
+    },
+  };
   mockServer.use(
-    http.get(origin + '/api/v2/books', ({ request }) => {
-      expect(Object.fromEntries(new URL(request.url).searchParams)).toEqual({
-        page: '3',
-        size: '12',
-        category: 'Architecture',
-        q: 'React & Java',
-      });
-      expect(request.headers.get('authorization')).toBeNull();
-      return HttpResponse.json({ books: [], page: 3, hasNext: true });
-    }),
-  );
-  await expect(
-    catalog.list({ page: 3, category: 'Architecture', q: 'React & Java' }),
-  ).resolves.toEqual({
-    books: [],
-    page: 3,
-    hasNext: true,
-  });
-});
-
-it('recognizes a placed order from an older Java 202 response', async () => {
-  const placed = examples['submission-placed-replay'].body;
-  mockServer.use(
-    http.post(origin + '/api/v2/me/order-submissions', async ({ request }) => {
+    http.post(origin + '/api/v1/me/order-submissions', async ({ request }) => {
       expect(request.headers.get('authorization')).toBe(
         'Bearer customer-access-token',
       );
       expect(request.headers.get('cookie')).toBeNull();
       expect(request.headers.get('idempotency-key')).toBe(quoteId);
       expect(await request.json()).toEqual({ quoteId });
-      return HttpResponse.json(
-        { ...placed, order: { ...placed.order, createdAt: undefined } },
-        { status: 202 },
-      );
+      return HttpResponse.json(placed);
     }),
   );
-  await expect(checkout.submit(quoteId, quoteId)).resolves.toMatchObject({
-    submissionId: placed.submissionId,
-    state: 'PLACED',
-    order: { orderId: placed.order.orderId, totalMinor: 5500 },
-  });
+  await expect(checkout.submit(quoteId, quoteId)).resolves.toEqual(placed);
 });
 
 it('rejects a placed response without an order ID', async () => {
   mockServer.use(
-    http.post(origin + '/api/v2/me/order-submissions', () =>
+    http.post(origin + '/api/v1/me/order-submissions', () =>
       HttpResponse.json(
         {
           submissionId,
@@ -82,7 +60,7 @@ it('rejects a placed response without an order ID', async () => {
 
 it('reads order history from stored line snapshots', async () => {
   mockServer.use(
-    http.get(origin + '/api/v2/me/orders', ({ request }) => {
+    http.get(origin + '/api/v1/me/orders', ({ request }) => {
       expect(
         Object.fromEntries(new URL(request.url).searchParams),
       ).toMatchObject({
@@ -132,7 +110,7 @@ it('reads order history from stored line snapshots', async () => {
 
 it('keeps another customer’s cancellation indistinguishable from a missing resource', async () => {
   mockServer.use(
-    http.get(origin + '/api/v2/me/orders/' + orderId + '/cancellation', () =>
+    http.get(origin + '/api/v1/me/orders/' + orderId + '/cancellation', () =>
       HttpResponse.json({ code: 'NOT_FOUND' }, { status: 404 }),
     ),
   );
@@ -145,7 +123,7 @@ it('keeps another customer’s cancellation indistinguishable from a missing res
 it('preserves cancellation status and the recorded reason', async () => {
   mockServer.use(
     http.put(
-      origin + '/api/v2/me/orders/' + orderId + '/cancellation',
+      origin + '/api/v1/me/orders/' + orderId + '/cancellation',
       async ({ request }) => {
         expect(request.headers.get('authorization')).toBe(
           'Bearer customer-access-token',
@@ -174,12 +152,11 @@ it('preserves cancellation status and the recorded reason', async () => {
 });
 
 it('returns a safe intake-closed response for a rejected quote request', async () => {
-  const example = examples['intake-closed'];
   mockServer.use(
-    http.post(origin + '/api/v2/me/order-quotes', () =>
+    http.post(origin + '/api/v1/me/order-quotes', () =>
       HttpResponse.json(
-        { ...example.body, detail: 'private' },
-        { status: example.status },
+        { code: 'INTAKE_CLOSED', detail: 'private' },
+        { status: 503 },
       ),
     ),
   );

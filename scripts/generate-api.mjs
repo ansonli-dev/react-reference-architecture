@@ -9,12 +9,8 @@ const specs = [
     'src/server/adapters/java/generated/catalog-v1.ts',
   ],
   [
-    'contracts/java/catalog-v2.yaml',
-    'src/server/adapters/java/generated/catalog-v2.ts',
-  ],
-  [
-    'contracts/java/order-v2.yaml',
-    'src/server/adapters/java/generated/order-v2.ts',
+    'contracts/java/order-v1.yaml',
+    'src/server/adapters/java/generated/order-v1.ts',
   ],
 ];
 

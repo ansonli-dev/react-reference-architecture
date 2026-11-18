@@ -10,7 +10,7 @@ import {
   type Currency,
 } from '@/features/checkout/model';
 import { ApiFailure } from '@/shared/api/error';
-import type { JavaSubmission, createJavaOrderV2 } from './order-v2.server';
+import type { JavaSubmission, createJavaOrder } from './order-v1.server';
 
 type CartItem = {
   bookId: string;
@@ -24,7 +24,7 @@ const draftLines = z.array(
   z.object({ bookId: z.uuid(), revision: shopperIdSchema }),
 );
 
-type OrderService = ReturnType<typeof createJavaOrderV2>;
+type OrderService = ReturnType<typeof createJavaOrder>;
 
 function etag(revision: string) {
   return '"' + revision + '"';

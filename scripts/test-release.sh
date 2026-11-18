@@ -36,7 +36,9 @@ docker network create --internal "$network" >/dev/null
 docker run -d --name "$fixture" --network "$network" --network-alias catalog \
   --entrypoint node "$image" --input-type=module --eval "$(cat test/support/release-java-fixture.mjs)" >/dev/null
 docker run -d --name "$ready" --network "$network" --network-alias storefront \
-  -e JAVA_CONTRACT=v1-catalog -e JAVA_CATALOG_BASE_URL=http://catalog:8081 \
+  -e JAVA_CATALOG_BASE_URL=http://catalog:8081 -e JAVA_ORDER_BASE_URL=http://catalog:8081 \
+  -e AUTH_DATABASE_URL=postgresql://fixture@127.0.0.1/fixture \
+  -e OIDC_ISSUER=http://127.0.0.1:8180/realms/fixture -e OIDC_CLIENT_SECRET=fixture \
   "$image" >/dev/null
 docker run -d --name "$empty" --network "$network" --network-alias unconfigured \
   "$image" >/dev/null
@@ -74,6 +76,10 @@ for (const origin of [ready, empty]) {
     const html = await catalogPage.text();
     assert.ok(html.includes('<html lang="' + locale + '"'));
     assert.ok(html.includes('href="/' + locale + '/books"'));
+    if (origin === ready) {
+      assert.ok(html.includes('>Isolated release fixture</a>'));
+      assert.ok(html.includes('value="Architecture"'));
+    }
     const asset = html.match(/(?:href|src)="(\/_next\/static\/[^"]+\.(?:css|js))"/)?.[1];
     assert.ok(asset, 'missing asset in catalog HTML');
     const stylesOrScript = await get(origin, asset);
@@ -91,7 +97,7 @@ const missing = await get(empty, '/api/ready');
 assert.equal(missing.status, 503);
 assert.deepEqual(await missing.json(), {
   status: 'unavailable',
-  reason: 'CATALOG_NOT_CONFIGURED',
+  reason: 'CONFIG_INVALID',
 });
 const catalog = await get(ready, '/api/v1/catalog/books');
 assert.equal(catalog.status, 200);
@@ -108,5 +114,8 @@ assert.deepEqual(await catalog.json(), {
     stock: 5,
   }],
 });
-console.log('Release smoke passed: localized catalogs and assets, health, readiness 200/503, fixture BFF.');
+const cart = await get(ready, '/api/v1/cart');
+assert.equal(cart.status, 401);
+assert.equal((await cart.json()).error.code, 'UNAUTHENTICATED');
+console.log('Release smoke passed: localized catalogs and assets, health, readiness 200/503, fixture catalog and anonymous checkout boundary.');
 JS

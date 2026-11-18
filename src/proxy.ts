@@ -1,7 +1,6 @@
 import createMiddleware from 'next-intl/middleware';
 import { NextResponse, type NextRequest } from 'next/server';
 import { routing } from './i18n/routing';
-import { checkoutEnabled } from './server/config/runtime.server';
 
 const localize = createMiddleware(routing);
 
@@ -16,17 +15,6 @@ export default function proxy(request: NextRequest) {
     url.pathname = '/' + locale + '/books';
     url.search = '';
     return NextResponse.redirect(url);
-  }
-
-  const shopLocale = routing.locales.find(
-    (candidate) =>
-      pathname === '/' + candidate + '/cart' ||
-      pathname === '/' + candidate + '/orders',
-  );
-  if (shopLocale && !checkoutEnabled()) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/' + shopLocale + '/not-available';
-    return NextResponse.rewrite(url, { status: 404 });
   }
 
   if (

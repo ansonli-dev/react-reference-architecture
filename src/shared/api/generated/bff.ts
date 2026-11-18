@@ -56,7 +56,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Available in demo and Java v2 integrated modes. The HttpOnly cookie identifies the shopper or customer session. */
+        /** @description Available in demo and release modes. The HttpOnly cookie identifies the shopper or customer session. */
         get: operations["getCart"];
         put?: never;
         post?: never;
@@ -94,7 +94,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Creates an expiring quote for the current cart revision and currency. Java v2 integrated checkout uses CNY. */
+        /** @description Creates an expiring quote for the current cart revision and currency. Release checkout uses CNY. */
         post: operations["createOrderQuote"];
         delete?: never;
         options?: never;
@@ -127,7 +127,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Demo creates the order and submission in one transaction. Java v2 integrated may process asynchronously. Retry the same quote with the same key and read the submission URL for the authoritative state. */
+        /** @description Demo creates the order and submission in one transaction. Release submissions may process asynchronously. Retry the same quote with the same key and read the submission URL for the authoritative state. */
         post: operations["submitOrder"];
         delete?: never;
         options?: never;
@@ -192,9 +192,9 @@ export interface paths {
             };
             cookie?: never;
         };
-        /** @description Available for the order owner in Java v2 integrated mode. */
+        /** @description Available for the order owner in the Java release. */
         get: operations["getOrderCancellation"];
-        /** @description Create or replay a cancellation for the order owner in Java v2 integrated mode. */
+        /** @description Create or replay a cancellation for the order owner in the Java release. */
         put: operations["putOrderCancellation"];
         post?: never;
         delete?: never;
@@ -313,7 +313,7 @@ export interface components {
         ApiError: {
             error: {
                 /** @enum {string} */
-                code: "INVALID_INPUT" | "UNAUTHENTICATED" | "FORBIDDEN" | "EMAIL_UNVERIFIED" | "BOOK_NOT_FOUND" | "RESOURCE_NOT_FOUND" | "CART_EMPTY" | "CART_CHANGED" | "CART_LIMIT" | "INSUFFICIENT_STOCK" | "AMOUNT_OUT_OF_RANGE" | "QUOTE_EXPIRED" | "QUOTE_CONSUMED" | "IDEMPOTENCY_CONFLICT" | "UNSUPPORTED_CURRENCY" | "VERSION_CONFLICT" | "ORDER_STATE_CONFLICT" | "CART_ITEM_PRECONDITION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "UNSUPPORTED_FILTER" | "INTERNAL_ERROR" | "UPSTREAM_FAILURE" | "CATALOG_UNAVAILABLE" | "INTAKE_CLOSED" | "UPSTREAM_TIMEOUT";
+                code: "INVALID_INPUT" | "UNAUTHENTICATED" | "FORBIDDEN" | "EMAIL_UNVERIFIED" | "BOOK_NOT_FOUND" | "RESOURCE_NOT_FOUND" | "CART_EMPTY" | "CART_CHANGED" | "CART_LIMIT" | "INSUFFICIENT_STOCK" | "AMOUNT_OUT_OF_RANGE" | "QUOTE_EXPIRED" | "QUOTE_CONSUMED" | "IDEMPOTENCY_CONFLICT" | "UNSUPPORTED_CURRENCY" | "VERSION_CONFLICT" | "ORDER_STATE_CONFLICT" | "CART_ITEM_PRECONDITION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "INTERNAL_ERROR" | "UPSTREAM_FAILURE" | "CATALOG_UNAVAILABLE" | "INTAKE_CLOSED" | "UPSTREAM_TIMEOUT";
                 /** Format: uuid */
                 requestId: string;
                 fields?: {
@@ -379,7 +379,7 @@ export interface operations {
         parameters: {
             query?: {
                 category?: string;
-                /** @description Keyword search is supported in demo and Java v2 integrated modes. */
+                /** @description Keyword search is supported in demo and release modes. */
                 q?: string;
                 page?: number;
             };
@@ -402,7 +402,6 @@ export interface operations {
                 };
             };
             400: components["responses"]["Error"];
-            422: components["responses"]["Error"];
             502: components["responses"]["Error"];
             503: components["responses"]["Error"];
             504: components["responses"]["Error"];
@@ -684,7 +683,7 @@ export interface operations {
     listOrders: {
         parameters: {
             query?: {
-                /** @description One-based page for Java v2 integrated order history. */
+                /** @description One-based page for release order history. */
                 page?: number;
             };
             header?: never;

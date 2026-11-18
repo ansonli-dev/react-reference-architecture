@@ -20,11 +20,7 @@ import { CheckoutButton, CheckoutForm } from '@/features/checkout/client';
 import { demoBookDescription } from '@/mocks/fixtures/catalog';
 import { routing } from '@/i18n/routing';
 import { readJavaSession } from '@/server/auth.server';
-import {
-  checkoutEnabled,
-  integratedEnabled,
-} from '@/server/config/runtime.server';
-import { readBook, supportsCatalogSearch } from '@/server/catalog.server';
+import { readBook } from '@/server/catalog.server';
 import { reportCatalogFailure } from '@/server/observability/catalog.server';
 import { ApiFailure } from '@/shared/api/error';
 import { CheckoutSignIn } from '../../../checkout-sign-in';
@@ -68,7 +64,7 @@ async function BookDetails({ params, searchParams }: DetailsProps) {
     sourceQuery = parseCatalogQuery({
       category,
       page,
-      q: supportsCatalogSearch() ? q : undefined,
+      q,
     });
   } catch (error) {
     if (!(error instanceof ApiFailure) || error.code !== 'INVALID_INPUT')
@@ -96,13 +92,12 @@ async function BookDetails({ params, searchParams }: DetailsProps) {
     );
   }
   if (!book) notFound();
-  const checkout = checkoutEnabled()
-    ? await getTranslations({ locale, namespace: 'Checkout' })
-    : null;
-  const signInToBuy = integratedEnabled() && !(await readJavaSession());
-  const description = integratedEnabled()
-    ? book.description
-    : checkout && demoBookDescription(book.id, locale);
+  const checkout = await getTranslations({ locale, namespace: 'Checkout' });
+  const demo = process.env.BOOKSTORE_BUILD_PROFILE === 'demo';
+  const signInToBuy = !demo && !(await readJavaSession());
+  const description = demo
+    ? demoBookDescription(book.id, locale)
+    : book.description;
 
   return (
     <>
@@ -147,7 +142,7 @@ async function BookDetails({ params, searchParams }: DetailsProps) {
                 returnTo={catalogHref(base + '/' + id, sourceQuery)}
               />
             )}
-            {checkout && !signInToBuy && (
+            {!signInToBuy && (
               <CheckoutForm
                 cartPath={'/' + locale + '/cart'}
                 operation={{ type: 'add', bookId: book.id }}

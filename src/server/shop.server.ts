@@ -3,12 +3,12 @@ import { headers } from 'next/headers';
 import type { Currency, OrderPage } from '@/features/checkout/model';
 import { ApiFailure } from '@/shared/api/error';
 import { createJavaCart } from './adapters/java/cart.server';
-import { createJavaCatalogV2 } from './adapters/java/catalog-v2.server';
+import { createJavaCatalog } from './adapters/java/catalog-v1.server';
 import { javaDb } from './adapters/java/db.server';
-import { createJavaOrderV2 } from './adapters/java/order-v2.server';
+import { createJavaOrder } from './adapters/java/order-v1.server';
 import { readJavaSession } from './auth.server';
 import { expireCatalogStock } from './catalog.server';
-import { integratedEnabled, runtimeConfig } from './config/runtime.server';
+import { runtimeConfig } from './config/runtime.server';
 import { demoShopMutation, readDemoShop } from './demo-shop.server';
 import { checkoutResult } from './http/checkout.server';
 import { assertMutationOrigin } from './http/origin.server';
@@ -20,27 +20,23 @@ export async function javaShop(mutation = false) {
   } catch {
     throw new ApiFailure('CATALOG_UNAVAILABLE');
   }
-  if (config.profile !== 'release' || config.javaContract !== 'v2-integrated')
-    throw new ApiFailure('RESOURCE_NOT_FOUND');
+  if (config.profile !== 'release') throw new ApiFailure('RESOURCE_NOT_FOUND');
   if (mutation) assertMutationOrigin(await headers(), config.appOrigin);
 
   const session = await readJavaSession();
   if (!session) throw new ApiFailure('UNAUTHENTICATED');
-  const orders = createJavaOrderV2(
-    config.javaOrderBaseUrl,
-    session.accessToken,
-  );
+  const orders = createJavaOrder(config.javaOrderBaseUrl, session.accessToken);
   const cart = createJavaCart(
     javaDb(config.authDatabaseUrl),
     session.subject,
-    createJavaCatalogV2(config.javaCatalogBaseUrl),
+    createJavaCatalog(config.javaCatalogBaseUrl),
     orders,
   );
   return { ...orders, ...cart };
 }
 
 export async function readShop() {
-  if (integratedEnabled()) return await javaShop();
+  if (process.env.BOOKSTORE_BUILD_PROFILE !== 'demo') return await javaShop();
   const session = await readDemoShop();
   return {
     async cart() {
@@ -65,7 +61,7 @@ export async function readShop() {
 }
 
 export async function mutateShop() {
-  if (integratedEnabled()) {
+  if (process.env.BOOKSTORE_BUILD_PROFILE !== 'demo') {
     const shop = await javaShop(true);
     return {
       ...shop,

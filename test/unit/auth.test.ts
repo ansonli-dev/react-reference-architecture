@@ -4,14 +4,19 @@ import {
   finishJavaLogin,
   javaLoginHref,
   logoutJavaSession,
+  readJavaSession,
   startJavaLogin,
 } from '@/server/auth.server';
 
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  connection: async () => {},
+}));
+
 const origin = 'http://localhost:3000';
 
-function enableIntegratedProfile() {
+function configureRelease() {
   vi.stubEnv('BOOKSTORE_BUILD_PROFILE', 'release');
-  vi.stubEnv('JAVA_CONTRACT', 'v2-integrated');
   vi.stubEnv('APP_ORIGIN', origin);
   vi.stubEnv('JAVA_CATALOG_BASE_URL', 'http://catalog:8081');
   vi.stubEnv('JAVA_ORDER_BASE_URL', 'http://order:8082');
@@ -43,9 +48,8 @@ describe('Keycloak login links', () => {
   });
 });
 
-it('keeps the Keycloak entry point disabled in the v1 release', async () => {
-  vi.stubEnv('BOOKSTORE_BUILD_PROFILE', 'release');
-  vi.stubEnv('JAVA_CONTRACT', 'v1-catalog');
+it('keeps the Keycloak entry point disabled in demo', async () => {
+  vi.stubEnv('BOOKSTORE_BUILD_PROFILE', 'demo');
   const result = await startJavaLogin(
     new NextRequest(origin + '/api/auth/signin/keycloak'),
   );
@@ -53,8 +57,14 @@ it('keeps the Keycloak entry point disabled in the v1 release', async () => {
   expect(result.headers.has('set-cookie')).toBe(false);
 });
 
+it('renders an unconfigured release shell without a session', async () => {
+  configureRelease();
+  vi.stubEnv('OIDC_CLIENT_SECRET', undefined);
+  await expect(readJavaSession()).resolves.toBeNull();
+});
+
 it('rejects a callback without a browser-bound login attempt', async () => {
-  enableIntegratedProfile();
+  configureRelease();
   const result = await finishJavaLogin(
     new NextRequest(
       origin + '/api/auth/oauth2/callback/keycloak?code=code&state=state',
@@ -67,7 +77,7 @@ it('rejects a callback without a browser-bound login attempt', async () => {
 it.each([undefined, 'http://external.test'])(
   'rejects POST logout from origin %s',
   async (requestOrigin) => {
-    enableIntegratedProfile();
+    configureRelease();
     const result = await logoutJavaSession(
       new NextRequest(origin + '/api/auth/logout', {
         method: 'POST',

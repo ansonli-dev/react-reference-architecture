@@ -19,41 +19,6 @@ const demoEnv = z.object({
   DEMO_DATA_DIR: demoDataDir.optional(),
 });
 
-const categories = z
-  .string()
-  .transform((input, context): unknown => {
-    try {
-      return JSON.parse(input);
-    } catch {
-      context.addIssue({ code: 'custom', message: 'Expected a JSON array' });
-      return z.NEVER;
-    }
-  })
-  .pipe(
-    z
-      .array(
-        z
-          .string()
-          .min(1)
-          .max(80)
-          .refine((value) => value === value.trim()),
-      )
-      .max(100)
-      .refine((values) => new Set(values).size === values.length),
-  )
-  .default([]);
-
-const v1Env = z.object({
-  APP_ORIGIN: appOrigin,
-  JAVA_CONTRACT: z.literal('v1-catalog').default('v1-catalog'),
-  JAVA_CATALOG_BASE_URL: origin.optional(),
-  JAVA_CATALOG_TOKEN: z
-    .string()
-    .regex(/^[!-~]+$/)
-    .optional(),
-  CATALOG_CATEGORIES_JSON: categories,
-});
-
 const realmUrl = z
   .string()
   .regex(/^https?:\/\/[^\s\\?#]+$/)
@@ -64,10 +29,9 @@ const realmUrl = z
   })
   .transform((value) => new URL(value).href.replace(/\/$/, ''));
 
-const v2Env = z
+const releaseEnv = z
   .object({
     APP_ORIGIN: appOrigin,
-    CATALOG_CATEGORIES_JSON: categories,
     JAVA_CATALOG_BASE_URL: origin,
     JAVA_ORDER_BASE_URL: origin,
     AUTH_DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
@@ -92,13 +56,11 @@ const v2Env = z
   });
 
 export type Profile = 'demo' | 'release';
-export type IntegratedConfig = {
+export type ReleaseConfig = {
   profile: 'release';
-  javaContract: 'v2-integrated';
   appOrigin: string;
   javaCatalogBaseUrl: string;
   javaOrderBaseUrl: string;
-  catalogCategories: string[];
   authDatabaseUrl: string;
   oidcIssuer: string;
   oidcInternalBaseUrl: string;
@@ -107,16 +69,7 @@ export type IntegratedConfig = {
 };
 
 export type RuntimeConfig =
-  | { profile: 'demo'; appOrigin: string; dataDir?: string }
-  | IntegratedConfig
-  | {
-      profile: 'release';
-      appOrigin: string;
-      javaContract: 'v1-catalog';
-      javaCatalogBaseUrl?: string;
-      javaCatalogToken?: string;
-      catalogCategories: string[];
-    };
+  { profile: 'demo'; appOrigin: string; dataDir?: string } | ReleaseConfig;
 
 export function parseRuntimeEnv(
   env: Readonly<Record<string, string | undefined>>,
@@ -132,47 +85,20 @@ export function parseRuntimeEnv(
     };
   }
 
-  if (env.JAVA_CONTRACT === 'v2-integrated') {
-    const parsed = v2Env.safeParse(env);
-    if (!parsed.success) throw new Error('Invalid runtime configuration');
-    return {
-      profile,
-      appOrigin: parsed.data.APP_ORIGIN,
-      javaContract: 'v2-integrated',
-      javaCatalogBaseUrl: parsed.data.JAVA_CATALOG_BASE_URL,
-      javaOrderBaseUrl: parsed.data.JAVA_ORDER_BASE_URL,
-      catalogCategories: parsed.data.CATALOG_CATEGORIES_JSON,
-      authDatabaseUrl: parsed.data.AUTH_DATABASE_URL,
-      oidcIssuer: parsed.data.OIDC_ISSUER,
-      oidcInternalBaseUrl:
-        parsed.data.OIDC_INTERNAL_BASE_URL ?? parsed.data.OIDC_ISSUER,
-      oidcClientId: parsed.data.OIDC_CLIENT_ID,
-      oidcClientSecret: parsed.data.OIDC_CLIENT_SECRET,
-    };
-  }
-
-  const parsed = v1Env.safeParse(env);
+  const parsed = releaseEnv.safeParse(env);
   if (!parsed.success) throw new Error('Invalid runtime configuration');
   return {
     profile,
     appOrigin: parsed.data.APP_ORIGIN,
-    javaContract: parsed.data.JAVA_CONTRACT,
     javaCatalogBaseUrl: parsed.data.JAVA_CATALOG_BASE_URL,
-    javaCatalogToken: parsed.data.JAVA_CATALOG_TOKEN,
-    catalogCategories: parsed.data.CATALOG_CATEGORIES_JSON,
+    javaOrderBaseUrl: parsed.data.JAVA_ORDER_BASE_URL,
+    authDatabaseUrl: parsed.data.AUTH_DATABASE_URL,
+    oidcIssuer: parsed.data.OIDC_ISSUER,
+    oidcInternalBaseUrl:
+      parsed.data.OIDC_INTERNAL_BASE_URL ?? parsed.data.OIDC_ISSUER,
+    oidcClientId: parsed.data.OIDC_CLIENT_ID,
+    oidcClientSecret: parsed.data.OIDC_CLIENT_SECRET,
   };
-}
-
-// Read runtime switches only after calling connection() in a request.
-export function integratedEnabled(): boolean {
-  return (
-    process.env.BOOKSTORE_BUILD_PROFILE !== 'demo' &&
-    process.env.JAVA_CONTRACT === 'v2-integrated'
-  );
-}
-
-export function checkoutEnabled(): boolean {
-  return process.env.BOOKSTORE_BUILD_PROFILE === 'demo' || integratedEnabled();
 }
 
 export function runtimeConfig(): RuntimeConfig {

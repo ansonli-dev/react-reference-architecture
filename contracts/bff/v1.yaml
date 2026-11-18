@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Reference Books BFF
   version: 1.0.0
-  description: Java v2 integrated private routes require an authenticated BFF session cookie. All responses use Cache-Control no-store.
+  description: Private release routes require an authenticated BFF session cookie. All responses use Cache-Control no-store.
 paths:
   /api/v1/catalog/books:
     get:
@@ -14,7 +14,7 @@ paths:
           schema: { type: string, minLength: 1, maxLength: 80 }
         - name: q
           in: query
-          description: Keyword search is supported in demo and Java v2 integrated modes.
+          description: Keyword search is supported in demo and release modes.
           schema: { type: string, minLength: 1, maxLength: 64 }
         - name: page
           in: query
@@ -26,7 +26,6 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/BookPage' }
         '400': { $ref: '#/components/responses/Error' }
-        '422': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
         '504': { $ref: '#/components/responses/Error' }
@@ -71,7 +70,7 @@ paths:
   /api/v1/cart:
     get:
       operationId: getCart
-      description: Available in demo and Java v2 integrated modes. The HttpOnly cookie identifies the shopper or customer session.
+      description: Available in demo and release modes. The HttpOnly cookie identifies the shopper or customer session.
       responses:
         '200':
           description: Private cart with current stock, prices, and a revision per currency.
@@ -158,7 +157,7 @@ paths:
   /api/v1/order-quotes:
     post:
       operationId: createOrderQuote
-      description: Creates an expiring quote for the current cart revision and currency. Java v2 integrated checkout uses CNY.
+      description: Creates an expiring quote for the current cart revision and currency. Release checkout uses CNY.
       requestBody:
         required: true
         content:
@@ -199,7 +198,7 @@ paths:
   /api/v1/order-submissions:
     post:
       operationId: submitOrder
-      description: Demo creates the order and submission in one transaction. Java v2 integrated may process asynchronously. Retry the same quote with the same key and read the submission URL for the authoritative state.
+      description: Demo creates the order and submission in one transaction. Release submissions may process asynchronously. Retry the same quote with the same key and read the submission URL for the authoritative state.
       parameters:
         - name: Idempotency-Key
           in: header
@@ -244,7 +243,7 @@ paths:
       parameters:
         - name: page
           in: query
-          description: One-based page for Java v2 integrated order history.
+          description: One-based page for release order history.
           schema: { type: integer, minimum: 1, maximum: 100, default: 1 }
       responses:
         '200':
@@ -285,7 +284,7 @@ paths:
         schema: { type: string, format: uuid }
     get:
       operationId: getOrderCancellation
-      description: Available for the order owner in Java v2 integrated mode.
+      description: Available for the order owner in the Java release.
       responses:
         '200':
           description: The saved cancellation.
@@ -296,7 +295,7 @@ paths:
         default: { $ref: '#/components/responses/Error' }
     put:
       operationId: putOrderCancellation
-      description: Create or replay a cancellation for the order owner in Java v2 integrated mode.
+      description: Create or replay a cancellation for the order owner in the Java release.
       requestBody:
         required: true
         content:
@@ -534,7 +533,6 @@ components:
                 - CART_ITEM_PRECONDITION_FAILED
                 - PAYLOAD_TOO_LARGE
                 - UNSUPPORTED_MEDIA_TYPE
-                - UNSUPPORTED_FILTER
                 - INTERNAL_ERROR
                 - UPSTREAM_FAILURE
                 - CATALOG_UNAVAILABLE

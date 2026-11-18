@@ -7,9 +7,8 @@ import { z } from 'zod';
 import { routing } from '@/i18n/routing';
 import { javaDb } from '@/server/adapters/java/db.server';
 import {
-  integratedEnabled,
   runtimeConfig,
-  type IntegratedConfig,
+  type ReleaseConfig,
 } from '@/server/config/runtime.server';
 import { assertMutationOrigin } from '@/server/http/origin.server';
 import { apiErrorResponse } from '@/server/http/response.server';
@@ -39,10 +38,14 @@ type LoginRow = {
   return_to: string;
 };
 
-function configuredAuth(): IntegratedConfig {
-  const config = runtimeConfig();
-  if (config.profile !== 'release' || config.javaContract !== 'v2-integrated')
-    throw new ApiFailure('RESOURCE_NOT_FOUND');
+function configuredAuth(): ReleaseConfig {
+  let config;
+  try {
+    config = runtimeConfig();
+  } catch {
+    throw new ApiFailure('CATALOG_UNAVAILABLE');
+  }
+  if (config.profile !== 'release') throw new ApiFailure('RESOURCE_NOT_FOUND');
   return config;
 }
 
@@ -67,7 +70,7 @@ export function javaLoginHref(returnTo: string): string {
   return `${loginPath}?${new URLSearchParams({ returnTo: returnPath(returnTo) })}`;
 }
 
-function cookieName(config: IntegratedConfig, kind: AuthCookie): string {
+function cookieName(config: ReleaseConfig, kind: AuthCookie): string {
   const prefix = config.appOrigin.startsWith('https:') ? '__Host-' : '';
   return `${prefix}bookstore-${kind}`;
 }
@@ -80,7 +83,7 @@ function cookieHash(value: string | undefined): string | null {
 
 function setCookie(
   response: NextResponse,
-  config: IntegratedConfig,
+  config: ReleaseConfig,
   kind: AuthCookie,
   value: string,
   maxAge: number,
@@ -104,7 +107,7 @@ function authRedirect(location: URL): NextResponse {
 let discovery:
   { key: string; pending: Promise<oidc.Configuration> } | undefined;
 
-function oidcConfig(config: IntegratedConfig): Promise<oidc.Configuration> {
+function oidcConfig(config: ReleaseConfig): Promise<oidc.Configuration> {
   const { oidcIssuer, oidcInternalBaseUrl, oidcClientId, oidcClientSecret } =
     config;
   const key = JSON.stringify([
@@ -279,8 +282,15 @@ export async function finishJavaLogin(request: NextRequest): Promise<Response> {
 
 export async function readJavaSession(): Promise<JavaSession | null> {
   await connection();
-  if (!integratedEnabled()) return null;
-  const config = configuredAuth();
+  if (process.env.BOOKSTORE_BUILD_PROFILE === 'demo') return null;
+  let config;
+  try {
+    config = configuredAuth();
+  } catch (error) {
+    if (error instanceof ApiFailure && error.code === 'CATALOG_UNAVAILABLE')
+      return null;
+    throw error;
+  }
   const requestCookies = await cookies();
   const idHash = cookieHash(
     requestCookies.get(cookieName(config, 'session'))?.value,

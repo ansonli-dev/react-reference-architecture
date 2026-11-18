@@ -7,7 +7,6 @@ import { hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { routing, type Locale } from '@/i18n/routing';
 import { javaLoginHref, readJavaSession } from '@/server/auth.server';
-import { integratedEnabled } from '@/server/config/runtime.server';
 import { ThemeSwitch } from '@/shared/ui/theme-switch';
 import { LanguageSwitch } from './language-switch';
 import { SkipLink } from './skip-link';
@@ -125,7 +124,6 @@ async function ShopLinks({ locale }: { locale: Locale }) {
 
 async function IntegratedLinks({ locale }: { locale: Locale }) {
   await connection();
-  if (!integratedEnabled()) return null;
   const t = await getTranslations({ locale, namespace: 'Shell' });
   const session = await readJavaSession();
   const books = '/' + locale + '/books';

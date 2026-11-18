@@ -33,7 +33,6 @@
     "pagination": "书籍分页",
     "page": "第 {page, number} 页",
     "invalid": "请检查筛选条件后重试。",
-    "unsupported": "当前目录只支持按分类筛选。",
     "unavailable": "书籍暂时无法加载。",
     "notFound": "找不到这本书",
     "back": "返回目录",

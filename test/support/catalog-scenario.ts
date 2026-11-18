@@ -7,6 +7,7 @@ export const missingBookId = '00000000-0000-4000-8000-000000009999';
 type Scenario = {
   mode?: 'failure' | 'broken' | 'unsafe';
   delayMs?: number;
+  firstBookStock?: number;
   resetCalls?: boolean;
 };
 type JavaCall = {

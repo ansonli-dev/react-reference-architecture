@@ -33,7 +33,6 @@
     "pagination": "Catalog pagination",
     "page": "Page {page, number}",
     "invalid": "Check your filters and try again.",
-    "unsupported": "Keyword search is unavailable for this catalog.",
     "unavailable": "Books are temporarily unavailable.",
     "notFound": "Book not found",
     "back": "Back to books",

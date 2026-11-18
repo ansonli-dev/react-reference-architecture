@@ -6,11 +6,11 @@ import { demoBooks } from '../../src/mocks/fixtures/catalog.ts';
 export const javaStubOrigin = 'http://127.0.0.1:3212';
 export const emptyCatalogPorts = { demo: 3213, release: 3214 };
 
-const books = demoBooks.map(({ priceMinor, ...book }) => ({
+const books = demoBooks.map((book) => ({
   ...book,
   title: 'Java fixture: ' + book.title,
-  priceCents: priceMinor,
 }));
+const categories = ['Architecture', 'Programming', 'Full shelf', 'Exact shelf'];
 
 const exactShelf = books.slice(0, 12).map((book, i) => ({
   ...book,
@@ -54,15 +54,24 @@ export async function startJavaCatalogStub() {
         .end('malformed json');
       return;
     }
+    if (url.pathname === '/api/v1/categories') {
+      return json(200, { categories });
+    }
+    const withStock = (book) =>
+      book.id === books[0].id && scenario.firstBookStock !== undefined
+        ? { ...book, stock: scenario.firstBookStock }
+        : book;
     if (url.pathname === '/api/v1/books') {
-      const page = Number(url.searchParams.get('page') ?? '0');
+      const page = Number(url.searchParams.get('page') ?? '1');
       const size = Number(url.searchParams.get('size') ?? '20');
       const category = url.searchParams.get('category');
+      const keyword = url.searchParams.get('q')?.toLowerCase();
       if (category === 'Full shelf') {
-        return json(
-          200,
-          Array.from({ length: size }, (_, i) => {
-            const n = page * size + i + 1;
+        return json(200, {
+          page,
+          hasNext: true,
+          books: Array.from({ length: size }, (_, i) => {
+            const n = (page - 1) * size + i + 1;
             return {
               ...books[0],
               id:
@@ -72,23 +81,29 @@ export async function startJavaCatalogStub() {
               title: 'Archive book ' + n,
             };
           }),
-        );
+        });
       }
-      const batch =
-        category === 'Exact shelf'
-          ? exactShelf
-          : category
-            ? books.filter((book) => book.category === category)
-            : books;
-      const result = batch.slice(page * size, (page + 1) * size);
+      const batch = (category === 'Exact shelf' ? exactShelf : books).filter(
+        (book) =>
+          (!category || book.category === category) &&
+          (!keyword ||
+            [book.title, book.author].some((value) =>
+              value.toLowerCase().includes(keyword),
+            )),
+      );
+      const result = batch.slice((page - 1) * size, page * size).map(withStock);
       if (mode === 'unsafe' && result.length)
-        return json(200, [{ ...result[0], priceCents: 9007199254740992 }]);
-      return json(200, result);
+        result[0] = { ...result[0], priceMinor: 9007199254740992 };
+      return json(200, {
+        page,
+        hasNext: batch.length > page * size,
+        books: result,
+      });
     }
     const book = [...books, ...exactShelf].find(
       ({ id }) => url.pathname === '/api/v1/books/' + id,
     );
-    if (book) return json(200, book);
+    if (book) return json(200, withStock(book));
     return json(404, { message: 'private stub detail' });
   });
   server.listen(Number(new URL(javaStubOrigin).port), '127.0.0.1');

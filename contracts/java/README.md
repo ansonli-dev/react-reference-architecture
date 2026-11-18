@@ -1,11 +1,10 @@
-# Java 接口快照
+# Java v1 OpenAPI 契约
 
-这组 Java v2 契约和响应样例固定到 `explicit-architecture` 提交 `4dd0e9dd9f4bf279633a35c186d11fb15f6ba6c7`。使用该提交的 `demo/compose.yaml` 和 `demo/compose.frontend.yaml` 启动联调环境，启动和验收命令见其 `demo/README.md`。
+发布构建的服务端适配器使用 Java 仓库中的 v1 接口定义。
 
-| 快照                                    | 后端源文件                               |
-| --------------------------------------- | ---------------------------------------- |
-| [目录 v2](catalog-v2.yaml)              | `catalog/contracts/catalog-v2.yaml`      |
-| [订单 v2](order-v2.yaml)                | `order/contracts/order-v2.yaml`          |
-| [实测订单响应](order-v2-responses.json) | `demo/contracts/order-v2-responses.json` |
+| 适配器契约              | Java 仓库源文件                     |
+| ----------------------- | ----------------------------------- |
+| [目录](catalog-v1.yaml) | `catalog/contracts/catalog-v1.yaml` |
+| [订单](order-v1.yaml)   | `order/contracts/order-v1.yaml`     |
 
-后端契约升级时，从同一提交复制这些文件，更新固定提交，再运行 `pnpm api:generate` 和 `pnpm api:check`。适配器测试复用实测响应，浏览器验收通过运行中的 BFF 和 Java 服务执行。
+更新适配器时，从 Java 源文件原样复制对应 YAML，运行 `pnpm api:generate` 并同步提交生成类型，再用 `pnpm api:check` 核对。浏览器使用独立的 [BFF OpenAPI 契约](../bff/v1.yaml)。[本地联调配置](../../docs/operations/run-and-release.md#java-集成)

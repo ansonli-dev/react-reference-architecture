@@ -11,7 +11,7 @@ import {
   type StoreOrder,
 } from '@/features/checkout/model';
 import { ApiFailure } from '@/shared/api/error';
-import type { components } from './generated/order-v2';
+import type { components } from './generated/order-v1';
 import { readJava, readJavaJson } from './http.server';
 
 type JavaSchemas = components['schemas'];
@@ -51,7 +51,7 @@ const list = z.object({
 });
 const submission = z.discriminatedUnion('state', [
   submissionSchema.options[0].extend({
-    order: orderSummary.extend({ createdAt: instant.nullable().optional() }),
+    order: orderSummary,
   }),
   submissionSchema.options[1],
   submissionSchema.options[2],
@@ -108,8 +108,8 @@ async function orderError(response: Response): Promise<never> {
   throw new ApiFailure('UPSTREAM_FAILURE');
 }
 
-export function createJavaOrderV2(baseUrl: string, accessToken: string) {
-  const api = baseUrl + '/api/v2/me';
+export function createJavaOrder(baseUrl: string, accessToken: string) {
+  const api = baseUrl + '/api/v1/me';
   const auth = { Authorization: 'Bearer ' + accessToken };
   function read<T>(
     path: string,

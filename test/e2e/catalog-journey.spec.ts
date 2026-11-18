@@ -115,13 +115,12 @@ test('details return to the originating catalog page and preserve it on language
       title: 'React 应用架构',
       id: firstBookId,
     },
-  ];
-  if (info.project.name === 'demo')
-    cases.push({
+    {
       query: '?category=Architecture&q=React',
       title: 'React 应用架构',
       id: firstBookId,
-    });
+    },
+  ];
   for (const { query, title, id } of cases) {
     const detail = '/books/' + id;
     const list = '/books' + query;
@@ -158,7 +157,7 @@ test('details return to the originating catalog page and preserve it on language
 
 test('a detail only uses valid known filters for its local return link', async ({
   page,
-}, info) => {
+}) => {
   const cases = [
     ['', ''],
     ['?category=Architecture&page=2&page=3', ''],
@@ -167,12 +166,7 @@ test('a detail only uses valid known filters for its local return link', async (
       '?returnTo=https%3A%2F%2Foutside.example%2F&category=Architecture&page=1',
       '?category=Architecture',
     ],
-    [
-      '?category=Architecture&q=React',
-      info.project.name === 'demo'
-        ? '?category=Architecture&q=React'
-        : '?category=Architecture',
-    ],
+    ['?category=Architecture&q=React', '?category=Architecture&q=React'],
   ];
   for (const [query, returned] of cases) {
     await page.goto('/en/books/' + firstBookId + query);
@@ -214,9 +208,9 @@ test('a failing detail retains the catalog and retries the same URL', async ({
   ).toBeVisible();
 });
 
-test('shows a clear recovery for invalid and unsupported filters', async ({
+test('recovers from invalid filters and accepts a keyword', async ({
   page,
-}, info) => {
+}) => {
   await page.goto('/en/books?page=101');
   await expect(page.getByRole('main').getByRole('alert')).toContainText(
     'Check your filters',
@@ -224,21 +218,10 @@ test('shows a clear recovery for invalid and unsupported filters', async ({
   await page.getByRole('link', { name: 'Reset filters' }).click();
   await expect(page).toHaveURL('/en/books');
 
-  if (info.project.name === 'demo') {
-    await page.getByLabel('Search books').fill('React');
-    await page.getByRole('button', { name: 'Apply filters' }).click();
-    await expect(page).toHaveURL('/en/books?q=React');
-    await expect(page.getByRole('article')).toHaveCount(2);
-  } else {
-    await expect(page.getByLabel('Search books')).toHaveCount(0);
-    await page.goto('/en/books?q=React');
-    await expect(page.getByRole('main').getByRole('alert')).toContainText(
-      'Keyword search is unavailable',
-    );
-    await expect(
-      page.getByRole('link', { name: 'Reset filters' }),
-    ).toHaveAttribute('href', '/en/books');
-  }
+  await page.getByLabel('Search books').fill('React');
+  await page.getByRole('button', { name: 'Apply filters' }).click();
+  await expect(page).toHaveURL('/en/books?q=React');
+  await expect(page.getByRole('article')).toHaveCount(2);
 });
 
 test('renders localized not-found content and an index guard for missing details', async ({
@@ -326,19 +309,17 @@ test('streams the static shell before the delayed upstream books', async ({
     }
     html += decoder.decode();
     expect(html).toContain('>Archive book 1189</a>');
-    expect(await readJavaCalls(request)).toEqual([
-      {
-        path: '/api/v1/books?category=Full%20shelf&page=99&size=12',
-        cookie: null,
-        authorization: 'Bearer fixture-service',
-      },
+    const paths = (await readJavaCalls(request)).map(({ path }) => path).sort();
+    expect(paths).toEqual([
+      '/api/v1/books?page=100&size=12&category=Full+shelf',
+      '/api/v1/categories',
     ]);
   } finally {
     await reader.cancel();
   }
 });
 
-test('different detail return links and BFF reuse one public book read', async ({
+test('detail return links preserve filters and each request reads Java', async ({
   request,
   page,
 }, info) => {
@@ -362,11 +343,11 @@ test('different detail return links and BFF reuse one public book read', async (
       page.getByRole('link', { name: 'Back to books' }),
     ).toHaveAttribute('href', '/en/books' + query);
   }
-  expect(await readJavaCalls(request)).toEqual([
-    {
+  expect(await readJavaCalls(request)).toEqual(
+    Array.from({ length: 5 }, () => ({
       path: '/api/v1/books/' + id,
       cookie: null,
-      authorization: 'Bearer fixture-service',
-    },
-  ]);
+      authorization: null,
+    })),
+  );
 });

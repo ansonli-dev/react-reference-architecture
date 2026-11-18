@@ -41,19 +41,23 @@ test('serves the correct profile from a live production server', async ({
   const list = await request.get('/en/books');
   expect(list.status()).toBe(200);
   const html = await list.text();
-  if (info.project.name === 'demo') {
-    expect(html).toContain('href="/en/cart"');
-    expect(html).toContain('href="/en/orders"');
-  } else {
-    expect(html).not.toContain('href="/en/cart"');
-    expect(html).not.toContain('href="/en/orders"');
-    for (const path of [
-      '/en/cart',
-      '/en/orders',
-      '/api/v1/cart',
-      '/api/v1/orders',
-    ]) {
-      expect((await request.get(path)).status()).toBe(404);
+  expect(html).toContain('href="/en/cart"');
+  expect(html).toContain('href="/en/orders"');
+
+  if (info.project.name === 'release') {
+    for (const path of ['/en/cart', '/en/orders']) {
+      const page = await request.get(path);
+      expect(page.status()).toBe(200);
+      expect(await page.text()).toContain(
+        'Sign in to use your cart and orders.',
+      );
+    }
+    for (const path of ['/api/v1/cart', '/api/v1/orders']) {
+      const response = await request.get(path);
+      expect(response.status()).toBe(401);
+      expect(await response.json()).toMatchObject({
+        error: { code: 'UNAUTHENTICATED' },
+      });
     }
     const entry = await request.post('/api/v1/session/demo', {
       data: { account: 'reader-a' },

@@ -27,7 +27,6 @@ test('applies edits as a URL with encoded filters and the default page', () => {
       base={base}
       query={{ category: 'Architecture', q: 'React', page: 2 }}
       categories={categories}
-      search
       labels={labels}
     />,
   );
@@ -55,7 +54,6 @@ test('omits cleared filters from the submitted URL', () => {
       base={base}
       query={{ category: 'Architecture', q: 'React', page: 2 }}
       categories={categories}
-      search
       labels={labels}
     />,
   );
@@ -77,7 +75,6 @@ test('keeps the selected category from an existing URL when it is absent from th
       base={base}
       query={{ category: 'Archived category', page: 1 }}
       categories={categories}
-      search={false}
       labels={labels}
     />,
   );
@@ -85,5 +82,4 @@ test('keeps the selected category from an existing URL when it is absent from th
   expect(
     screen.getByRole('combobox', { name: labels.category }),
   ).toHaveProperty('value', 'Archived category');
-  expect(screen.queryByRole('searchbox', { name: labels.search })).toBeNull();
 });

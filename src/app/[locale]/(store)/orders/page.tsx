@@ -16,7 +16,6 @@ import {
   type OrderPage,
 } from '@/features/checkout/model';
 import { routing, type Locale } from '@/i18n/routing';
-import { checkoutEnabled } from '@/server/config/runtime.server';
 import { readShop } from '@/server/shop.server';
 import { ApiFailure } from '@/shared/api/error';
 import { Button } from '@/shared/ui/button';
@@ -56,7 +55,6 @@ async function OrderHistory({
   searchParams: Props['searchParams'];
 }) {
   await connection();
-  if (!checkoutEnabled()) notFound();
   const t = await getTranslations({ locale, namespace: 'Checkout' });
   const query = await searchParams;
   const placed = shopperIdSchema.safeParse(query.placed).data;

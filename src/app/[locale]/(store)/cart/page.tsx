@@ -19,10 +19,6 @@ import {
   type OrderQuote,
 } from '@/features/checkout/model';
 import { routing, type Locale } from '@/i18n/routing';
-import {
-  checkoutEnabled,
-  integratedEnabled,
-} from '@/server/config/runtime.server';
 import { readShop } from '@/server/shop.server';
 import { ApiFailure } from '@/shared/api/error';
 import { Button } from '@/shared/ui/button';
@@ -63,7 +59,6 @@ async function CartContent({
   searchParams: Props['searchParams'];
 }) {
   await connection();
-  if (!checkoutEnabled()) notFound();
   const t = await getTranslations({ locale, namespace: 'Checkout' });
   const { notice: rawNotice, quote: rawQuote } = await searchParams;
   const quoteId = shopperIdSchema.safeParse(rawQuote).data;
@@ -347,7 +342,11 @@ async function QuoteConfirmation({
           }}
         >
           <CheckoutButton
-            label={t(integratedEnabled() ? 'placeLiveOrder' : 'placeOrder')}
+            label={t(
+              process.env.BOOKSTORE_BUILD_PROFILE === 'demo'
+                ? 'placeOrder'
+                : 'placeLiveOrder',
+            )}
             pendingLabel={t('placing')}
             blocked={false}
           />
