@@ -5,37 +5,17 @@ import type { CatalogQuery } from '@/features/catalog/model';
 import type { CatalogPort } from '@/features/catalog/server';
 import type { Locale } from '@/i18n/routing';
 import { ApiFailure } from '@/shared/api/error';
-import { createJavaCatalogV1 } from './adapters/java/catalog-v1.server';
+import { createJavaCatalog } from './adapters/java/catalog-v1.server';
 import { runtimeConfig, type RuntimeConfig } from './config/runtime.server';
 
 type CatalogSource =
   | { profile: 'demo'; dataDir: string }
-  | {
-      profile: 'release';
-      baseUrl: string;
-      categories: string[];
-      token?: string;
-    };
-
-export const supportsCatalogSearch =
-  process.env.BOOKSTORE_BUILD_PROFILE === 'demo';
+  | { profile: 'release'; baseUrl: string };
 
 function sourceFor(config: RuntimeConfig): CatalogSource | null {
-  if (supportsCatalogSearch && config.profile === 'demo' && config.dataDir) {
-    return { profile: 'demo', dataDir: config.dataDir };
-  }
-  if (
-    config.profile === 'release' &&
-    config.javaContract === 'v1-catalog' &&
-    config.javaCatalogBaseUrl
-  ) {
-    return {
-      profile: 'release',
-      baseUrl: config.javaCatalogBaseUrl,
-      categories: config.catalogCategories,
-      token: config.javaCatalogToken,
-    };
-  }
+  if (config.profile === 'release')
+    return { profile: 'release', baseUrl: config.javaCatalogBaseUrl };
+  if (config.dataDir) return { profile: 'demo', dataDir: config.dataDir };
   return null;
 }
 
@@ -50,7 +30,7 @@ function requireSource() {
 }
 
 async function catalogPort(source: CatalogSource): Promise<CatalogPort> {
-  if (source.profile === 'release') return createJavaCatalogV1(source);
+  if (source.profile === 'release') return createJavaCatalog(source.baseUrl);
   if (process.env.BOOKSTORE_BUILD_PROFILE === 'demo') {
     const { createDemoCatalog } =
       await import('./adapters/demo/catalog.server');
@@ -60,12 +40,9 @@ async function catalogPort(source: CatalogSource): Promise<CatalogPort> {
   throw new ApiFailure('CATALOG_UNAVAILABLE');
 }
 
-function cacheScope(source: CatalogSource, locale: Locale) {
-  const address = source.profile === 'demo' ? source.dataDir : source.baseUrl;
+function cacheScope(dataDir: string, locale: Locale) {
   return {
-    profile: source.profile,
-    contract: source.profile === 'demo' ? 'demo-v1' : 'v1-catalog',
-    dataset: createHash('sha256').update(address).digest('hex'),
+    dataset: createHash('sha256').update(dataDir).digest('hex'),
     locale,
   };
 }
@@ -126,36 +103,36 @@ async function cachedBook(key: { scope: Scope; bookId: string }) {
   return cacheRead((port) => port.get(key.bookId));
 }
 
-async function categoriesFor(source: CatalogSource) {
-  if (source.profile === 'release') return source.categories;
-  return (await catalogPort(source)).categories();
-}
-
 export async function readCatalogCategories() {
-  return categoriesFor(requireSource());
+  return (await catalogPort(requireSource())).categories();
 }
 
 export async function readCatalog(locale: Locale, query: CatalogQuery) {
-  if (query.q && !supportsCatalogSearch)
-    throw new ApiFailure('UNSUPPORTED_FILTER');
   const source = requireSource();
+  if (source.profile === 'release')
+    return createJavaCatalog(source.baseUrl).list(query);
   if (
     !query.q &&
     query.page <= 10 &&
-    (!query.category || (await categoriesFor(source)).includes(query.category))
+    (!query.category ||
+      (await readCatalogCategories()).includes(query.category))
   ) {
-    return cachedList({ scope: cacheScope(source, locale), query }).catch(
-      restoreCacheError,
-    );
+    return cachedList({
+      scope: cacheScope(source.dataDir, locale),
+      query,
+    }).catch(restoreCacheError);
   }
   return (await catalogPort(source)).list(query);
 }
 
 export async function readBook(locale: Locale, bookId: string) {
   const source = requireSource();
-  return cachedBook({ scope: cacheScope(source, locale), bookId }).catch(
-    restoreCacheError,
-  );
+  if (source.profile === 'release')
+    return createJavaCatalog(source.baseUrl).get(bookId);
+  return cachedBook({
+    scope: cacheScope(source.dataDir, locale),
+    bookId,
+  }).catch(restoreCacheError);
 }
 
 export async function probeCatalog() {

@@ -10,16 +10,21 @@ import {
   CatalogNotice,
   formatBookPrice,
 } from '@/features/catalog/client';
-import { shopperIdSchema, type DemoOrder } from '@/features/checkout/model';
+import {
+  parseOrdersPage,
+  shopperIdSchema,
+  type OrderPage,
+} from '@/features/checkout/model';
 import { routing, type Locale } from '@/i18n/routing';
-import { readDemoShop } from '@/server/demo-shop.server';
+import { readShop } from '@/server/shop.server';
 import { ApiFailure } from '@/shared/api/error';
 import { Button } from '@/shared/ui/button';
+
+import { CheckoutSignIn } from '../../checkout-sign-in';
 
 type Props = PageProps<'/[locale]/orders'>;
 
 export default async function OrdersPage({ params, searchParams }: Props) {
-  if (process.env.BOOKSTORE_BUILD_PROFILE !== 'demo') notFound();
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
@@ -51,21 +56,28 @@ async function OrderHistory({
 }) {
   await connection();
   const t = await getTranslations({ locale, namespace: 'Checkout' });
-  const placed = shopperIdSchema.safeParse((await searchParams).placed).data;
-  let orders: DemoOrder[];
+  const query = await searchParams;
+  const placed = shopperIdSchema.safeParse(query.placed).data;
+  const page = parseOrdersPage(query.page) ?? 1;
+  const ordersPath = '/' + locale + '/orders';
+  let orderPage: OrderPage;
   try {
-    const session = await readDemoShop();
-    orders = session?.shop.orders(session.shopper) ?? [];
+    orderPage = await (await readShop()).orders(page);
   } catch (error) {
     if (!(error instanceof ApiFailure)) throw error;
+    const href = ordersPath + (page > 1 ? '?page=' + page : '');
+    if (error.code === 'UNAUTHENTICATED')
+      return <CheckoutSignIn locale={locale} returnTo={href} />;
     return (
       <CatalogNotice
         message={t('notices.unavailable')}
-        href={'/' + locale + '/orders'}
+        href={href}
         action={t('retry')}
       />
     );
   }
+  const { orders, hasNext } = orderPage;
+  const catalog = await getTranslations({ locale, namespace: 'Catalog' });
   const date = new Intl.DateTimeFormat(locale, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -94,71 +106,104 @@ async function OrderHistory({
         </div>
       ) : (
         <ol className="mt-6 space-y-4">
-          {orders.map(({ id, currency, totalMinor, createdAt, lines }) => (
-            <li
-              key={id}
-              className="border-line bg-surface overflow-hidden rounded-xl border"
-            >
-              <div className="border-line bg-accent/55 flex flex-wrap items-start justify-between gap-4 border-b px-4 py-4 sm:px-5">
-                <div className="min-w-0">
-                  <h2 className="text-sm font-semibold wrap-anywhere">
-                    {t('order', { id })}
-                  </h2>
-                  <p className="text-muted mt-2 text-xs">
-                    {t('orderedAt')}{' '}
-                    <time dateTime={createdAt}>
-                      {date.format(new Date(createdAt))}
-                    </time>
-                  </p>
-                </div>
-                <div className="text-sm sm:text-right">
-                  <p className="font-semibold tabular-nums">
-                    <span className="text-muted mr-2 font-normal">
-                      {t('total')}
-                    </span>
-                    <span>
-                      {formatBookPrice(locale, {
-                        priceMinor: totalMinor,
-                        currency,
-                      })}
-                    </span>
-                  </p>
-                  <p className="text-primary mt-1 text-xs font-medium">
-                    {t('placedStatus')}
-                  </p>
-                </div>
-              </div>
-              <ul className="divide-line divide-y px-4 sm:px-5">
-                {lines.map((line) => (
-                  <li
-                    key={line.bookId}
-                    className="flex items-center gap-3 py-3"
-                  >
-                    <BookCover
-                      book={{ id: line.bookId, title: line.title }}
-                      size="thumbnail"
-                    />
-                    <div className="flex min-w-0 grow flex-wrap items-baseline justify-between gap-x-5 gap-y-1">
-                      <Link
-                        href={'/' + locale + '/books/' + line.bookId}
-                        prefetch={false}
-                        className="hover:text-primary rounded-sm text-sm font-semibold wrap-anywhere hover:underline"
-                      >
-                        {line.title}
-                      </Link>
-                      <span className="text-muted text-sm">
-                        {t('orderLine', {
-                          quantity: line.quantity,
-                          price: formatBookPrice(locale, { ...line, currency }),
+          {orders.map(
+            ({ id, currency, totalMinor, createdAt, lines, status }) => (
+              <li
+                key={id}
+                className="border-line bg-surface overflow-hidden rounded-xl border"
+              >
+                <div className="border-line bg-accent/55 flex flex-wrap items-start justify-between gap-4 border-b px-4 py-4 sm:px-5">
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-semibold wrap-anywhere">
+                      {t('order', { id })}
+                    </h2>
+                    {createdAt && (
+                      <p className="text-muted mt-2 text-xs">
+                        {t('orderedAt')}{' '}
+                        <time dateTime={createdAt}>
+                          {date.format(new Date(createdAt))}
+                        </time>
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-sm sm:text-right">
+                    <p className="font-semibold tabular-nums">
+                      <span className="text-muted mr-2 font-normal">
+                        {t('total')}
+                      </span>
+                      <span>
+                        {formatBookPrice(locale, {
+                          priceMinor: totalMinor,
+                          currency,
                         })}
                       </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </li>
-          ))}
+                    </p>
+                    <p className="text-primary mt-1 text-xs font-medium">
+                      {t(status ? 'orderStatus.' + status : 'placedStatus')}
+                    </p>
+                  </div>
+                </div>
+                <ul className="divide-line divide-y px-4 sm:px-5">
+                  {lines.map((line) => (
+                    <li
+                      key={line.bookId}
+                      className="flex items-center gap-3 py-3"
+                    >
+                      <BookCover
+                        book={{ id: line.bookId, title: line.title }}
+                        size="thumbnail"
+                      />
+                      <div className="flex min-w-0 grow flex-wrap items-baseline justify-between gap-x-5 gap-y-1">
+                        <Link
+                          href={'/' + locale + '/books/' + line.bookId}
+                          prefetch={false}
+                          className="hover:text-primary rounded-sm text-sm font-semibold wrap-anywhere hover:underline"
+                        >
+                          {line.title}
+                        </Link>
+                        <span className="text-muted text-sm">
+                          {t('orderLine', {
+                            quantity: line.quantity,
+                            price: formatBookPrice(locale, {
+                              ...line,
+                              currency,
+                            }),
+                          })}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ),
+          )}
         </ol>
+      )}
+      {orderPage.page !== undefined && (page > 1 || hasNext) && (
+        <nav
+          aria-label={t('pagination')}
+          className="mt-6 flex flex-wrap items-center justify-center gap-6 text-sm"
+        >
+          {page > 1 && (
+            <Link
+              className="text-primary underline"
+              prefetch={false}
+              href={ordersPath + (page > 2 ? '?page=' + (page - 1) : '')}
+            >
+              {catalog('previous')}
+            </Link>
+          )}
+          <span aria-current="page">{catalog('page', { page })}</span>
+          {hasNext && page < 100 && (
+            <Link
+              className="text-primary underline"
+              prefetch={false}
+              href={ordersPath + '?page=' + (page + 1)}
+            >
+              {catalog('next')}
+            </Link>
+          )}
+        </nav>
       )}
       {orders.length > 0 && (
         <Link

@@ -19,13 +19,11 @@ export function CatalogFilters({
   base,
   query,
   categories,
-  search,
   labels,
 }: {
   base: string;
   query: CatalogQuery;
   categories: string[];
-  search: boolean;
   labels: Labels;
 }) {
   const router = useRouter();
@@ -51,33 +49,31 @@ export function CatalogFilters({
         );
       }}
     >
-      {search && (
-        <div className="col-span-2 min-w-0 grow">
-          <label
-            htmlFor="catalog-query"
-            className="mb-1.5 block text-sm font-semibold"
-          >
-            {labels.search}
-          </label>
-          <div className="relative">
-            <Search
-              size={17}
-              aria-hidden
-              className="text-muted pointer-events-none absolute top-3.5 left-3"
-            />
-            <Input
-              key={query.q}
-              id="catalog-query"
-              type="search"
-              name="q"
-              placeholder={labels.searchHint}
-              maxLength={64}
-              defaultValue={query.q}
-              className="h-11 pl-9"
-            />
-          </div>
+      <div className="col-span-2 min-w-0 grow">
+        <label
+          htmlFor="catalog-query"
+          className="mb-1.5 block text-sm font-semibold"
+        >
+          {labels.search}
+        </label>
+        <div className="relative">
+          <Search
+            size={17}
+            aria-hidden
+            className="text-muted pointer-events-none absolute top-3.5 left-3"
+          />
+          <Input
+            key={query.q}
+            id="catalog-query"
+            type="search"
+            name="q"
+            placeholder={labels.searchHint}
+            maxLength={64}
+            defaultValue={query.q}
+            className="h-11 pl-9"
+          />
         </div>
-      )}
+      </div>
       <div className="min-w-0 sm:w-48">
         <label
           htmlFor="catalog-category"

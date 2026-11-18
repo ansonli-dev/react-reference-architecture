@@ -13,11 +13,7 @@ import {
 } from '@/features/catalog/client';
 import { parseCatalogQuery, type CatalogQuery } from '@/features/catalog/model';
 import { routing, type Locale } from '@/i18n/routing';
-import {
-  readCatalog,
-  readCatalogCategories,
-  supportsCatalogSearch,
-} from '@/server/catalog.server';
+import { readCatalog, readCatalogCategories } from '@/server/catalog.server';
 import { reportCatalogFailure } from '@/server/observability/catalog.server';
 import { ApiFailure } from '@/shared/api/error';
 
@@ -83,16 +79,6 @@ async function CatalogContent({
     );
   }
 
-  if (query.q && !supportsCatalogSearch) {
-    return (
-      <CatalogNotice
-        message={t('unsupported')}
-        href={base}
-        action={t('reset')}
-      />
-    );
-  }
-
   let data;
   let categories;
   try {
@@ -118,7 +104,6 @@ async function CatalogContent({
         base={base}
         query={query}
         categories={categories}
-        search={supportsCatalogSearch}
         labels={{
           category: t('category'),
           allCategories: t('allCategories'),

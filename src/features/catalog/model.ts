@@ -14,6 +14,8 @@ export const bookSchema = z.object({
   priceMinor: z.int().nonnegative(),
   currency: z.enum(['CNY', 'USD']),
   stock: z.int32().nonnegative(),
+  description: z.string().max(10_000).optional(),
+  coverUrl: z.url({ protocol: /^https?$/ }).optional(),
 });
 
 const querySchema = z.strictObject({

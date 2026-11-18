@@ -2,6 +2,7 @@ openapi: 3.1.0
 info:
   title: Reference Books BFF
   version: 1.0.0
+  description: Private release routes require an authenticated BFF session cookie. All responses use Cache-Control no-store.
 paths:
   /api/v1/catalog/books:
     get:
@@ -13,7 +14,7 @@ paths:
           schema: { type: string, minLength: 1, maxLength: 80 }
         - name: q
           in: query
-          description: Keyword search is supported in teaching mode.
+          description: Keyword search is supported in demo and release modes.
           schema: { type: string, minLength: 1, maxLength: 64 }
         - name: page
           in: query
@@ -25,7 +26,6 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/BookPage' }
         '400': { $ref: '#/components/responses/Error' }
-        '422': { $ref: '#/components/responses/Error' }
         '502': { $ref: '#/components/responses/Error' }
         '503': { $ref: '#/components/responses/Error' }
         '504': { $ref: '#/components/responses/Error' }
@@ -51,10 +51,26 @@ paths:
         '503': { $ref: '#/components/responses/Error' }
         '504': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
+  /api/v1/catalog/categories:
+    get:
+      operationId: listCatalogCategories
+      responses:
+        '200':
+          description: Public catalog categories.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [categories]
+                properties:
+                  categories:
+                    type: array
+                    items: { type: string }
+        default: { $ref: '#/components/responses/Error' }
   /api/v1/cart:
     get:
       operationId: getCart
-      description: Demo profile only. The shopper is identified by the HttpOnly cookie.
+      description: Available in demo and release modes. The HttpOnly cookie identifies the shopper or customer session.
       responses:
         '200':
           description: Private cart with current stock, prices, and a revision per currency.
@@ -90,7 +106,7 @@ paths:
         default: { $ref: '#/components/responses/Error' }
     put:
       operationId: putCartItem
-      description: Demo profile only. Sets the absolute quantity. An unchanged quantity leaves the cart revision unchanged.
+      description: Sets the absolute quantity. An unchanged quantity leaves the cart revision unchanged.
       parameters:
         - name: If-Match
           in: header
@@ -141,7 +157,7 @@ paths:
   /api/v1/order-quotes:
     post:
       operationId: createOrderQuote
-      description: Freezes the current values for one currency of a demo cart for ten minutes.
+      description: Creates an expiring quote for the current cart revision and currency. Release checkout uses CNY.
       requestBody:
         required: true
         content:
@@ -182,7 +198,7 @@ paths:
   /api/v1/order-submissions:
     post:
       operationId: submitOrder
-      description: Demo profile only. The order and submission are created in the same transaction. The same key and quote replay the existing submission.
+      description: Demo creates the order and submission in one transaction. Release submissions may process asynchronously. Retry the same quote with the same key and read the submission URL for the authoritative state.
       parameters:
         - name: Idempotency-Key
           in: header
@@ -201,6 +217,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/Submission' }
         '201': { $ref: '#/components/responses/Submission' }
+        '202': { $ref: '#/components/responses/Submission' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
@@ -217,15 +234,20 @@ paths:
           description: The current shopper's recorded submission.
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/PlacedSubmission' }
+              schema: { $ref: '#/components/schemas/Submission' }
         '404': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
   /api/v1/orders:
     get:
       operationId: listOrders
+      parameters:
+        - name: page
+          in: query
+          description: One-based page for release order history.
+          schema: { type: integer, minimum: 1, maximum: 100, default: 1 }
       responses:
         '200':
-          description: The current shopper's demo orders, most recent first.
+          description: The current shopper's orders, most recent first.
           content:
             application/json:
               schema:
@@ -235,6 +257,8 @@ paths:
                   orders:
                     type: array
                     items: { $ref: '#/components/schemas/Order' }
+                  page: { type: integer, minimum: 1, maximum: 100 }
+                  hasNext: { type: boolean }
         default: { $ref: '#/components/responses/Error' }
   /api/v1/orders/{orderId}:
     get:
@@ -251,6 +275,43 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/Order' }
         '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+  /api/v1/orders/{orderId}/cancellation:
+    parameters:
+      - name: orderId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      operationId: getOrderCancellation
+      description: Available for the order owner in the Java release.
+      responses:
+        '200':
+          description: The saved cancellation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cancellation' }
+        '404': { $ref: '#/components/responses/Error' }
+        default: { $ref: '#/components/responses/Error' }
+    put:
+      operationId: putOrderCancellation
+      description: Create or replay a cancellation for the order owner in the Java release.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason, expectedVersion]
+              properties:
+                reason: { type: string, minLength: 1, maxLength: 200 }
+                expectedVersion: { $ref: '#/components/schemas/MoneyMinor' }
+      responses:
+        '200': { $ref: '#/components/responses/Cancellation' }
+        '201': { $ref: '#/components/responses/Cancellation' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
         default: { $ref: '#/components/responses/Error' }
 components:
   headers:
@@ -270,12 +331,19 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/CartItem' }
     Submission:
-      description: Newly placed or replayed submission.
+      description: Customer-owned submission. Only PLACED with an order ID confirms purchase.
       headers:
         Location: { $ref: '#/components/headers/ResourceLocation' }
       content:
         application/json:
-          schema: { $ref: '#/components/schemas/PlacedSubmission' }
+          schema: { $ref: '#/components/schemas/Submission' }
+    Cancellation:
+      description: Customer-owned cancellation resource.
+      headers:
+        Location: { $ref: '#/components/headers/ResourceLocation' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Cancellation' }
     Error:
       description: Safe application error.
       content:
@@ -345,6 +413,33 @@ components:
         lines:
           type: array
           items: { $ref: '#/components/schemas/OrderLine' }
+    OrderStatus:
+      type: string
+      enum: [PENDING, PLACED, CONFIRMED, SHIPPED, CANCELLED]
+    Submission:
+      oneOf:
+        - $ref: '#/components/schemas/PlacedSubmission'
+        - type: object
+          required: [submissionId, state]
+          properties:
+            submissionId: { type: string, format: uuid }
+            state: { type: string, enum: [PROCESSING, RECONCILE_REQUIRED] }
+        - type: object
+          required: [submissionId, state, reason]
+          properties:
+            submissionId: { type: string, format: uuid }
+            state: { type: string, const: REJECTED }
+            reason:
+              {
+                type: string,
+                enum:
+                  [
+                    PRICE_CHANGED,
+                    INSUFFICIENT_STOCK,
+                    BOOK_NOT_FOUND,
+                    PLACEMENT_ABORTED,
+                  ],
+              }
     PlacedSubmission:
       type: object
       required: [submissionId, state, order]
@@ -356,6 +451,17 @@ components:
           required: [orderId]
           properties:
             orderId: { type: string, format: uuid }
+            status: { $ref: '#/components/schemas/OrderStatus' }
+            totalMinor: { $ref: '#/components/schemas/MoneyMinor' }
+            currency: { $ref: '#/components/schemas/Currency' }
+            createdAt: { type: [string, 'null'], format: date-time }
+    Cancellation:
+      type: object
+      required: [orderId, reason, cancelledAt]
+      properties:
+        orderId: { type: string, format: uuid }
+        reason: { type: string }
+        cancelledAt: { type: string, format: date-time }
     Order:
       type: object
       required: [id, currency, totalMinor, createdAt, lines]
@@ -363,7 +469,9 @@ components:
         id: { type: string, format: uuid }
         currency: { $ref: '#/components/schemas/Currency' }
         totalMinor: { $ref: '#/components/schemas/MoneyMinor' }
-        createdAt: { type: string, format: date-time }
+        createdAt: { type: [string, 'null'], format: date-time }
+        status: { $ref: '#/components/schemas/OrderStatus' }
+        version: { $ref: '#/components/schemas/MoneyMinor' }
         lines:
           type: array
           items: { $ref: '#/components/schemas/OrderLine' }
@@ -379,6 +487,8 @@ components:
         priceMinor: { type: integer, minimum: 0, maximum: 9007199254740991 }
         currency: { type: string, enum: [CNY, USD] }
         stock: { type: integer, minimum: 0 }
+        description: { type: string }
+        coverUrl: { type: string, format: uri }
     BookPage:
       type: object
       additionalProperties: false
@@ -404,7 +514,9 @@ components:
               type: string
               enum:
                 - INVALID_INPUT
+                - UNAUTHENTICATED
                 - FORBIDDEN
+                - EMAIL_UNVERIFIED
                 - BOOK_NOT_FOUND
                 - RESOURCE_NOT_FOUND
                 - CART_EMPTY
@@ -415,13 +527,16 @@ components:
                 - QUOTE_EXPIRED
                 - QUOTE_CONSUMED
                 - IDEMPOTENCY_CONFLICT
+                - UNSUPPORTED_CURRENCY
+                - VERSION_CONFLICT
+                - ORDER_STATE_CONFLICT
                 - CART_ITEM_PRECONDITION_FAILED
                 - PAYLOAD_TOO_LARGE
                 - UNSUPPORTED_MEDIA_TYPE
-                - UNSUPPORTED_FILTER
                 - INTERNAL_ERROR
                 - UPSTREAM_FAILURE
                 - CATALOG_UNAVAILABLE
+                - INTAKE_CLOSED
                 - UPSTREAM_TIMEOUT
             requestId: { type: string, format: uuid }
             fields:

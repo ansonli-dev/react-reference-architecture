@@ -92,6 +92,14 @@ test('serves typed lists and details from the configured data source', async ({
   );
   expect(detail.headers()['cache-control']).toBe('no-store');
   expect(await detail.json()).toEqual(expected);
+  const categories = await request.get('/api/v1/catalog/categories');
+  await expect(categories).toBeOK();
+  expect(await categories.json()).toEqual({
+    categories:
+      info.project.name === 'demo'
+        ? ['Architecture', 'Programming']
+        : ['Architecture', 'Programming', 'Full shelf', 'Exact shelf'],
+  });
   expect((await request.get('/api/ready')).status()).toBe(200);
 });
 
@@ -120,100 +128,96 @@ test('validates inputs and distinguishes an unknown UUID', async ({
   });
 });
 
-test('only the teaching profile accepts a keyword', async ({
-  request,
-}, info) => {
-  const response = await request.get(books + '?q=React');
+test('finds books by keyword and category', async ({ request }, info) => {
+  const response = await request.get(books + '?q=React&category=Architecture');
+  expect(response.status()).toBe(200);
+  const title =
+    info.project.name === 'demo'
+      ? 'React 应用架构'
+      : 'Java fixture: React 应用架构';
+  expect(await response.json()).toMatchObject({
+    page: 1,
+    hasNext: false,
+    books: [{ id: firstBookId, title, category: 'Architecture' }],
+  });
   if (info.project.name === 'release') {
-    expect(response.status()).toBe(422);
-    expect(await response.json()).toMatchObject({
-      error: { code: 'UNSUPPORTED_FILTER' },
-    });
-    expect(await readJavaCalls(request)).toEqual([]);
-  } else {
-    expect(response.status()).toBe(200);
-    expect((await response.json()).books).toHaveLength(2);
+    expect(await readJavaCalls(request)).toEqual([
+      {
+        path: '/api/v1/books?page=1&size=12&category=Architecture&q=React',
+        cookie: null,
+        authorization: null,
+      },
+    ]);
   }
 });
 
-test('caches identical public reads per locale and ignores browser identity', async ({
+test('reads current list and detail stock without forwarding browser identity', async ({
   request,
 }, info) => {
   test.skip(info.project.name !== 'release');
-  const path = books + '?category=Programming&page=3';
-  const a = await request.get(path, {
-    headers: { 'Accept-Language': 'zh-CN', Cookie: 'SESSION=a' },
-  });
-  const b = await request.get(path, {
+  const listPath = books + '?category=Architecture';
+  const detailPath = books + '/' + firstBookId;
+  const options = {
     headers: {
-      'Accept-Language': 'zh-CN',
-      Cookie: 'SESSION=b',
+      'Accept-Language': 'en',
+      Cookie: 'SESSION=browser-session',
       Authorization: 'Bearer browser-data',
     },
-  });
-  expect(a.status()).toBe(200);
-  expect(b.status()).toBe(200);
-  expect(await a.json()).toEqual(await b.json());
-  expect(await readJavaCalls(request)).toEqual([
+  };
+
+  for (const stock of [5, 2]) {
+    await setJavaScenario(request, { firstBookStock: stock });
+    const list = await request.get(listPath, options);
+    const detail = await request.get(detailPath, options);
+    await expect(list).toBeOK();
+    await expect(detail).toBeOK();
+    expect((await list.json()).books[0]).toMatchObject({
+      id: firstBookId,
+      stock,
+    });
+    expect(await detail.json()).toMatchObject({ id: firstBookId, stock });
+  }
+
+  const calls = [
     {
-      path: '/api/v1/books?category=Programming&page=2&size=12',
+      path: '/api/v1/books?page=1&size=12&category=Architecture',
       cookie: null,
-      authorization: 'Bearer fixture-service',
+      authorization: null,
     },
-  ]);
-  const en = await request.get(path, { headers: { 'Accept-Language': 'en' } });
-  expect(en.status()).toBe(200);
-  expect(await readJavaCalls(request)).toHaveLength(2);
+    {
+      path: '/api/v1/books/' + firstBookId,
+      cookie: null,
+      authorization: null,
+    },
+  ];
+  expect(await readJavaCalls(request)).toEqual([...calls, ...calls]);
 });
 
-test('a full last page ends and its cold BFF result is reused by the page and BFF', async ({
+test('honors Java pagination on a full last page', async ({
   page,
   request,
 }, info) => {
   test.skip(info.project.name !== 'release');
   const query = '?category=Exact+shelf';
-  const options = { headers: { 'Accept-Language': 'en' } };
-  const start = performance.now();
-  const cold = await request.get(books + query, options);
-  const coldBffMs = performance.now() - start;
-  expect(cold.status()).toBe(200);
-  const data = await cold.json();
+  const response = await request.get(books + query);
+  expect(response.status()).toBe(200);
+  const data = await response.json();
   expect(data).toMatchObject({ page: 1, hasNext: false });
   expect(data.books).toHaveLength(12);
-  const calls = ['0', '1'].map((upstreamPage) => ({
-    path:
-      '/api/v1/books?category=Exact%20shelf&page=' + upstreamPage + '&size=12',
+  const listCall = {
+    path: '/api/v1/books?page=1&size=12&category=Exact+shelf',
     cookie: null,
-    authorization: 'Bearer fixture-service',
-  }));
-  expect(await readJavaCalls(request)).toEqual(calls);
+    authorization: null,
+  };
+  expect(await readJavaCalls(request)).toEqual([listCall]);
 
-  const pageStart = performance.now();
   await page.goto('/en/books' + query);
-  await expect(page.getByRole('article')).toHaveCount(12);
-  const warmPageMs = performance.now() - pageStart;
   await expect(
     page.getByRole('article').getByRole('heading', { level: 2 }),
   ).toHaveText(data.books.map((book: { title: string }) => book.title));
   await expect(page.getByRole('link', { name: 'Next page' })).toHaveCount(0);
-  expect(await readJavaCalls(request)).toEqual(calls);
-
-  const warmStart = performance.now();
-  const warm = await request.get(books + query, options);
-  const warmBffMs = performance.now() - warmStart;
-  expect(warm.status()).toBe(200);
-  expect(await warm.json()).toEqual(data);
-  expect(await readJavaCalls(request)).toEqual(calls);
-  await info.attach('catalog-cache-baseline.json', {
-    contentType: 'application/json',
-    body: JSON.stringify({
-      node: process.version,
-      coldBffMs,
-      warmPageMs,
-      warmBffMs,
-      upstreamCalls: [2, 0, 0],
-    }),
-  });
+  const paths = (await readJavaCalls(request)).map(({ path }) => path).sort();
+  expect(paths).toEqual([listCall.path, listCall.path, '/api/v1/categories']);
 });
 
 test('distinguishes gateway failures and deadlines and can recover the same query', async ({
@@ -346,9 +350,7 @@ test('builds start without dependencies and expose only a safe readiness reason'
   expect(await response.json()).toEqual({
     status: 'unavailable',
     reason:
-      info.project.name === 'demo'
-        ? 'CATALOG_UNAVAILABLE'
-        : 'CATALOG_NOT_CONFIGURED',
+      info.project.name === 'demo' ? 'CATALOG_UNAVAILABLE' : 'CONFIG_INVALID',
   });
   const catalog = await request.get(url + books);
   expect(catalog.status()).toBe(503);

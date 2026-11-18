@@ -41,9 +41,12 @@ try {
   const env = { ...process.env };
   for (const name of [
     'JAVA_CATALOG_BASE_URL',
-    'JAVA_CONTRACT',
-    'CATALOG_CATEGORIES_JSON',
-    'JAVA_CATALOG_TOKEN',
+    'JAVA_ORDER_BASE_URL',
+    'AUTH_DATABASE_URL',
+    'OIDC_ISSUER',
+    'OIDC_INTERNAL_BASE_URL',
+    'OIDC_CLIENT_ID',
+    'OIDC_CLIENT_SECRET',
   ]) {
     delete env[name];
   }
@@ -67,14 +70,13 @@ try {
   }
   if (profile === 'release' && !withoutCatalog) {
     stub = await startJavaCatalogStub();
-    env.JAVA_CATALOG_BASE_URL = javaStubOrigin;
-    env.JAVA_CATALOG_TOKEN = 'fixture-service';
-    env.CATALOG_CATEGORIES_JSON = JSON.stringify([
-      'Architecture',
-      'Programming',
-      'Full shelf',
-      'Exact shelf',
-    ]);
+    Object.assign(env, {
+      JAVA_CATALOG_BASE_URL: javaStubOrigin,
+      JAVA_ORDER_BASE_URL: javaStubOrigin,
+      AUTH_DATABASE_URL: 'postgresql://fixture@127.0.0.1/fixture',
+      OIDC_ISSUER: 'http://127.0.0.1:8180/realms/fixture',
+      OIDC_CLIENT_SECRET: 'fixture',
+    });
   }
   const runner = fileURLToPath(
     new URL('../../scripts/run-app.mjs', import.meta.url),

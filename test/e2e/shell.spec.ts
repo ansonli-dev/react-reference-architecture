@@ -52,7 +52,7 @@ test('the language and theme controls work from the keyboard', async ({
   await page
     .getByRole('banner')
     .getByRole('link', {
-      name: info.project.name === 'release' ? '书籍目录' : '订单',
+      name: info.project.name === 'release' ? '登录' : '订单',
     })
     .focus();
   await page.keyboard.press('Tab');

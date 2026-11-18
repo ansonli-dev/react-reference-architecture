@@ -1,4 +1,4 @@
-import { readDemoShop } from '@/server/demo-shop.server';
+import { readShop } from '@/server/shop.server';
 import {
   checkoutResponse,
   parseResourceId,
@@ -12,7 +12,7 @@ export function GET(
 ) {
   return checkoutResponse(async () => {
     const id = parseResourceId((await params).quoteId);
-    const session = await readDemoShop();
-    return apiJson(requireResource(session?.shop.quote(session.shopper, id)));
+    const shop = await readShop();
+    return apiJson(requireResource(await shop.quote(id)));
   });
 }

@@ -1,6 +1,6 @@
-import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, expect, it } from 'vitest';
 import { delay, http, HttpResponse } from 'msw';
-import { createJavaCatalogV1 } from '@/server/adapters/java/catalog-v1.server';
+import { createJavaCatalog } from '@/server/adapters/java/catalog-v1.server';
 import { mockServer } from '../mocks/server';
 
 const origin = 'http://catalog.example.test';
@@ -11,167 +11,69 @@ const wireBook = {
   title: 'From Java',
   author: 'Anson',
   category: 'Architecture & design',
-  priceCents: 4900,
+  priceMinor: 4900,
   currency: 'CNY',
   stock: 5,
+  coverUrl: 'https://catalog.example.test/cover.jpg',
+  description: 'A catalog description.',
 };
-const catalog = createJavaCatalogV1({
-  baseUrl: origin,
-  categories: [wireBook.category],
-  token: 'service-token',
-});
-const fullPage = Array.from({ length: 12 }, (_, index) => ({
-  ...wireBook,
-  id: '00000000-0000-4000-8000-' + String(index + 101).padStart(12, '0'),
-}));
+const catalog = createJavaCatalog(origin);
 
 beforeAll(() => mockServer.listen({ onUnhandledFrame: 'error' }));
-afterEach(() => {
-  mockServer.resetHandlers();
-  vi.restoreAllMocks();
-});
+afterEach(() => mockServer.resetHandlers());
 afterAll(() => mockServer.close());
 
-it('converts page 2 to upstream page 1 and maps priceCents without exposing a service credential', async () => {
+it('sends a one-based catalog query without private credentials', async () => {
   mockServer.use(
     http.get(books, ({ request }) => {
-      const { searchParams } = new URL(request.url);
-      expect(Object.fromEntries(searchParams)).toEqual({
-        category: wireBook.category,
-        page: '1',
+      expect(Object.fromEntries(new URL(request.url).searchParams)).toEqual({
+        page: '3',
         size: '12',
+        category: wireBook.category,
+        q: 'React & Java',
       });
-      expect(request.headers.get('authorization')).toBe('Bearer service-token');
+      expect(request.headers.get('authorization')).toBeNull();
       expect(request.headers.get('cookie')).toBeNull();
-      return HttpResponse.json([wireBook]);
+      return HttpResponse.json({ books: [wireBook], page: 3, hasNext: true });
     }),
   );
-  await expect(catalog.categories()).resolves.toEqual([wireBook.category]);
   await expect(
-    catalog.list({ category: wireBook.category, page: 2 }),
-  ).resolves.toEqual({
-    books: [
-      {
-        id,
-        title: wireBook.title,
-        author: wireBook.author,
-        category: wireBook.category,
-        priceMinor: 4900,
-        currency: 'CNY',
-        stock: 5,
-      },
-    ],
-    page: 2,
+    catalog.list({ page: 3, category: wireBook.category, q: 'React & Java' }),
+  ).resolves.toEqual({ books: [wireBook], page: 3, hasNext: true });
+});
+
+it('reads category options and book details from Java', async () => {
+  mockServer.use(
+    http.get(origin + '/api/v1/categories', () =>
+      HttpResponse.json({ categories: [wireBook.category] }),
+    ),
+    http.get(books + '/' + id, () => HttpResponse.json(wireBook)),
+  );
+  await expect(catalog.categories()).resolves.toEqual([wireBook.category]);
+  await expect(catalog.get(id)).resolves.toEqual(wireBook);
+});
+
+it('limits pagination to the last supported page', async () => {
+  mockServer.use(
+    http.get(books, () =>
+      HttpResponse.json({ books: [wireBook], page: 100, hasNext: true }),
+    ),
+  );
+  await expect(catalog.list({ page: 100 })).resolves.toEqual({
+    books: [wireBook],
+    page: 100,
     hasNext: false,
   });
 });
 
-it('maps a missing upstream book to null', async () => {
-  mockServer.use(
-    http.get(
-      books + '/:id',
-      () => new HttpResponse('hidden body', { status: 404 }),
-    ),
-  );
-  await expect(catalog.get(id)).resolves.toBeNull();
-});
-
-it.each([false, true])(
-  'checks a full page when the next page has books: %s',
-  async (hasNext) => {
-    const calls: Array<{
-      query: Record<string, string>;
-      authorization: string | null;
-    }> = [];
-    mockServer.use(
-      http.get(books, ({ request }) => {
-        const query = Object.fromEntries(new URL(request.url).searchParams);
-        calls.push({
-          query,
-          authorization: request.headers.get('authorization'),
-        });
-        return HttpResponse.json(
-          query.page === '1' ? fullPage : hasNext ? [wireBook] : [],
-        );
-      }),
-    );
-    const result = await catalog.list({ page: 2, category: wireBook.category });
-    expect(result.books).toHaveLength(12);
-    expect(result.books.map((book) => book.id)).toEqual(
-      fullPage.map((book) => book.id),
-    );
-    expect(result).toMatchObject({ page: 2, hasNext });
-    expect(calls).toEqual(
-      ['1', '2'].map((page) => ({
-        query: { category: wireBook.category, page, size: '12' },
-        authorization: 'Bearer service-token',
-      })),
-    );
-  },
-);
-
 it.each([
-  { page: 2, upstreamPage: '1', batch: [wireBook] },
-  { page: 100, upstreamPage: '99', batch: fullPage },
-])(
-  'skips the probe on a known last page ($page)',
-  async ({ page, upstreamPage, batch }) => {
-    const calls: Array<string | null> = [];
-    mockServer.use(
-      http.get(books, ({ request }) => {
-        calls.push(new URL(request.url).searchParams.get('page'));
-        return HttpResponse.json(batch);
-      }),
-    );
-    await expect(catalog.list({ page })).resolves.toMatchObject({
-      hasNext: false,
-    });
-    expect(calls).toEqual([upstreamPage]);
-  },
-);
-
-it('rejects duplicate IDs on the next page instead of treating it as evidence of more books', async () => {
-  mockServer.use(
-    http.get(books, ({ request }) =>
-      HttpResponse.json(
-        new URL(request.url).searchParams.get('page') === '0'
-          ? fullPage
-          : [wireBook, wireBook],
-      ),
-    ),
-  );
+  { books: [wireBook, wireBook], page: 1, hasNext: false },
+  { books: [wireBook], page: 2, hasNext: false },
+])('rejects duplicate IDs and mismatched pages %j', async (payload) => {
+  mockServer.use(http.get(books, () => HttpResponse.json(payload)));
   await expect(catalog.list({ page: 1 })).rejects.toMatchObject({
     code: 'UPSTREAM_FAILURE',
   });
-});
-
-it('uses one deadline and propagates its abort to the next-page request', async () => {
-  const deadline = new AbortController();
-  const timeout = vi
-    .spyOn(AbortSignal, 'timeout')
-    .mockReturnValue(deadline.signal);
-  let probeAborted = false;
-  mockServer.use(
-    http.get(books, ({ request }) => {
-      if (new URL(request.url).searchParams.get('page') === '0') {
-        return HttpResponse.json(fullPage);
-      }
-      request.signal.addEventListener(
-        'abort',
-        () => {
-          probeAborted = true;
-        },
-        { once: true },
-      );
-      deadline.abort();
-      return HttpResponse.json([]);
-    }),
-  );
-  await expect(catalog.list({ page: 1 })).rejects.toMatchObject({
-    code: 'UPSTREAM_TIMEOUT',
-  });
-  expect(timeout.mock.calls).toEqual([[2000]]);
-  expect(probeAborted).toBe(true);
 });
 
 it.each([
@@ -211,7 +113,7 @@ it.each([
                   if (++chunks <= paddingChunks) controller.enqueue(chunk);
                   else {
                     controller.enqueue(
-                      new TextEncoder().encode(JSON.stringify([wireBook])),
+                      new TextEncoder().encode(JSON.stringify(wireBook)),
                     );
                     controller.close();
                   }
@@ -235,14 +137,8 @@ it.each([
   },
 );
 
-it('rejects v1 keyword queries before any upstream call', async () => {
-  await expect(catalog.list({ page: 1, q: 'React' })).rejects.toMatchObject({
-    code: 'UNSUPPORTED_FILTER',
-  });
-});
-
 it.each([
-  { ...wireBook, priceCents: 9007199254740992 },
+  { ...wireBook, priceMinor: Number.MAX_SAFE_INTEGER + 1 },
   { ...wireBook, currency: 'EUR' },
   { ...wireBook, stock: -1 },
   { ...wireBook, id: '00000000-0000-4000-8000-000000000102' },

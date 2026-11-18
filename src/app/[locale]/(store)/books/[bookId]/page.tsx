@@ -19,9 +19,11 @@ import {
 import { CheckoutButton, CheckoutForm } from '@/features/checkout/client';
 import { demoBookDescription } from '@/mocks/fixtures/catalog';
 import { routing } from '@/i18n/routing';
-import { readBook, supportsCatalogSearch } from '@/server/catalog.server';
+import { readJavaSession } from '@/server/auth.server';
+import { readBook } from '@/server/catalog.server';
 import { reportCatalogFailure } from '@/server/observability/catalog.server';
 import { ApiFailure } from '@/shared/api/error';
+import { CheckoutSignIn } from '../../../checkout-sign-in';
 import Loading from '../loading';
 
 type DetailsProps = PageProps<'/[locale]/books/[bookId]'>;
@@ -62,7 +64,7 @@ async function BookDetails({ params, searchParams }: DetailsProps) {
     sourceQuery = parseCatalogQuery({
       category,
       page,
-      q: supportsCatalogSearch ? q : undefined,
+      q,
     });
   } catch (error) {
     if (!(error instanceof ApiFailure) || error.code !== 'INVALID_INPUT')
@@ -90,13 +92,12 @@ async function BookDetails({ params, searchParams }: DetailsProps) {
     );
   }
   if (!book) notFound();
-  const checkout =
-    process.env.BOOKSTORE_BUILD_PROFILE === 'demo'
-      ? await getTranslations({ locale, namespace: 'Checkout' })
-      : null;
-  const description = checkout
+  const checkout = await getTranslations({ locale, namespace: 'Checkout' });
+  const demo = process.env.BOOKSTORE_BUILD_PROFILE === 'demo';
+  const signInToBuy = !demo && !(await readJavaSession());
+  const description = demo
     ? demoBookDescription(book.id, locale)
-    : undefined;
+    : book.description;
 
   return (
     <>
@@ -135,7 +136,13 @@ async function BookDetails({ params, searchParams }: DetailsProps) {
                 {book.stock ? t('stock', { count: book.stock }) : t('soldOut')}
               </p>
             </div>
-            {checkout && (
+            {signInToBuy && book.stock > 0 && (
+              <CheckoutSignIn
+                locale={locale}
+                returnTo={catalogHref(base + '/' + id, sourceQuery)}
+              />
+            )}
+            {!signInToBuy && (
               <CheckoutForm
                 cartPath={'/' + locale + '/cart'}
                 operation={{ type: 'add', bookId: book.id }}

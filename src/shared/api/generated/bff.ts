@@ -33,6 +33,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/catalog/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listCatalogCategories"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cart": {
         parameters: {
             query?: never;
@@ -40,7 +56,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** @description Demo profile only. The shopper is identified by the HttpOnly cookie. */
+        /** @description Available in demo and release modes. The HttpOnly cookie identifies the shopper or customer session. */
         get: operations["getCart"];
         put?: never;
         post?: never;
@@ -60,7 +76,7 @@ export interface paths {
             cookie?: never;
         };
         get: operations["getCartItem"];
-        /** @description Demo profile only. Sets the absolute quantity. An unchanged quantity leaves the cart revision unchanged. */
+        /** @description Sets the absolute quantity. An unchanged quantity leaves the cart revision unchanged. */
         put: operations["putCartItem"];
         post?: never;
         delete: operations["deleteCartItem"];
@@ -78,7 +94,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Freezes the current values for one currency of a demo cart for ten minutes. */
+        /** @description Creates an expiring quote for the current cart revision and currency. Release checkout uses CNY. */
         post: operations["createOrderQuote"];
         delete?: never;
         options?: never;
@@ -111,7 +127,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** @description Demo profile only. The order and submission are created in the same transaction. The same key and quote replay the existing submission. */
+        /** @description Demo creates the order and submission in one transaction. Release submissions may process asynchronously. Retry the same quote with the same key and read the submission URL for the authoritative state. */
         post: operations["submitOrder"];
         delete?: never;
         options?: never;
@@ -167,6 +183,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/orders/{orderId}/cancellation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: string;
+            };
+            cookie?: never;
+        };
+        /** @description Available for the order owner in the Java release. */
+        get: operations["getOrderCancellation"];
+        /** @description Create or replay a cancellation for the order owner in the Java release. */
+        put: operations["putOrderCancellation"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -207,6 +243,21 @@ export interface components {
             totalMinor: components["schemas"]["MoneyMinor"];
             lines: components["schemas"]["OrderLine"][];
         };
+        /** @enum {string} */
+        OrderStatus: "PENDING" | "PLACED" | "CONFIRMED" | "SHIPPED" | "CANCELLED";
+        Submission: components["schemas"]["PlacedSubmission"] | {
+            /** Format: uuid */
+            submissionId: string;
+            /** @enum {string} */
+            state: "PROCESSING" | "RECONCILE_REQUIRED";
+        } | {
+            /** Format: uuid */
+            submissionId: string;
+            /** @constant */
+            state: "REJECTED";
+            /** @enum {string} */
+            reason: "PRICE_CHANGED" | "INSUFFICIENT_STOCK" | "BOOK_NOT_FOUND" | "PLACEMENT_ABORTED";
+        };
         PlacedSubmission: {
             /** Format: uuid */
             submissionId: string;
@@ -215,7 +266,19 @@ export interface components {
             order: {
                 /** Format: uuid */
                 orderId: string;
+                status?: components["schemas"]["OrderStatus"];
+                totalMinor?: components["schemas"]["MoneyMinor"];
+                currency?: components["schemas"]["Currency"];
+                /** Format: date-time */
+                createdAt?: string | null;
             };
+        };
+        Cancellation: {
+            /** Format: uuid */
+            orderId: string;
+            reason: string;
+            /** Format: date-time */
+            cancelledAt: string;
         };
         Order: {
             /** Format: uuid */
@@ -223,7 +286,9 @@ export interface components {
             currency: components["schemas"]["Currency"];
             totalMinor: components["schemas"]["MoneyMinor"];
             /** Format: date-time */
-            createdAt: string;
+            createdAt: string | null;
+            status?: components["schemas"]["OrderStatus"];
+            version?: components["schemas"]["MoneyMinor"];
             lines: components["schemas"]["OrderLine"][];
         };
         Book: {
@@ -236,6 +301,9 @@ export interface components {
             /** @enum {string} */
             currency: "CNY" | "USD";
             stock: number;
+            description?: string;
+            /** Format: uri */
+            coverUrl?: string;
         };
         BookPage: {
             books: components["schemas"]["Book"][];
@@ -245,7 +313,7 @@ export interface components {
         ApiError: {
             error: {
                 /** @enum {string} */
-                code: "INVALID_INPUT" | "FORBIDDEN" | "BOOK_NOT_FOUND" | "RESOURCE_NOT_FOUND" | "CART_EMPTY" | "CART_CHANGED" | "CART_LIMIT" | "INSUFFICIENT_STOCK" | "AMOUNT_OUT_OF_RANGE" | "QUOTE_EXPIRED" | "QUOTE_CONSUMED" | "IDEMPOTENCY_CONFLICT" | "CART_ITEM_PRECONDITION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "UNSUPPORTED_FILTER" | "INTERNAL_ERROR" | "UPSTREAM_FAILURE" | "CATALOG_UNAVAILABLE" | "UPSTREAM_TIMEOUT";
+                code: "INVALID_INPUT" | "UNAUTHENTICATED" | "FORBIDDEN" | "EMAIL_UNVERIFIED" | "BOOK_NOT_FOUND" | "RESOURCE_NOT_FOUND" | "CART_EMPTY" | "CART_CHANGED" | "CART_LIMIT" | "INSUFFICIENT_STOCK" | "AMOUNT_OUT_OF_RANGE" | "QUOTE_EXPIRED" | "QUOTE_CONSUMED" | "IDEMPOTENCY_CONFLICT" | "UNSUPPORTED_CURRENCY" | "VERSION_CONFLICT" | "ORDER_STATE_CONFLICT" | "CART_ITEM_PRECONDITION_FAILED" | "PAYLOAD_TOO_LARGE" | "UNSUPPORTED_MEDIA_TYPE" | "INTERNAL_ERROR" | "UPSTREAM_FAILURE" | "CATALOG_UNAVAILABLE" | "INTAKE_CLOSED" | "UPSTREAM_TIMEOUT";
                 /** Format: uuid */
                 requestId: string;
                 fields?: {
@@ -264,14 +332,24 @@ export interface components {
                 "application/json": components["schemas"]["CartItem"];
             };
         };
-        /** @description Newly placed or replayed submission. */
+        /** @description Customer-owned submission. Only PLACED with an order ID confirms purchase. */
         Submission: {
             headers: {
                 Location: components["headers"]["ResourceLocation"];
                 [name: string]: unknown;
             };
             content: {
-                "application/json": components["schemas"]["PlacedSubmission"];
+                "application/json": components["schemas"]["Submission"];
+            };
+        };
+        /** @description Customer-owned cancellation resource. */
+        Cancellation: {
+            headers: {
+                Location: components["headers"]["ResourceLocation"];
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Cancellation"];
             };
         };
         /** @description Safe application error. */
@@ -301,7 +379,7 @@ export interface operations {
         parameters: {
             query?: {
                 category?: string;
-                /** @description Keyword search is supported in teaching mode. */
+                /** @description Keyword search is supported in demo and release modes. */
                 q?: string;
                 page?: number;
             };
@@ -324,7 +402,6 @@ export interface operations {
                 };
             };
             400: components["responses"]["Error"];
-            422: components["responses"]["Error"];
             502: components["responses"]["Error"];
             503: components["responses"]["Error"];
             504: components["responses"]["Error"];
@@ -359,6 +436,29 @@ export interface operations {
             502: components["responses"]["Error"];
             503: components["responses"]["Error"];
             504: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    listCatalogCategories: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Public catalog categories. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        categories: string[];
+                    };
+                };
+            };
             default: components["responses"]["Error"];
         };
     };
@@ -550,6 +650,7 @@ export interface operations {
         responses: {
             200: components["responses"]["Submission"];
             201: components["responses"]["Submission"];
+            202: components["responses"]["Submission"];
             404: components["responses"]["Error"];
             409: components["responses"]["Error"];
             default: components["responses"]["Error"];
@@ -572,7 +673,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PlacedSubmission"];
+                    "application/json": components["schemas"]["Submission"];
                 };
             };
             404: components["responses"]["Error"];
@@ -581,14 +682,17 @@ export interface operations {
     };
     listOrders: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description One-based page for release order history. */
+                page?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
         };
         requestBody?: never;
         responses: {
-            /** @description The current shopper's demo orders, most recent first. */
+            /** @description The current shopper's orders, most recent first. */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -596,6 +700,8 @@ export interface operations {
                 content: {
                     "application/json": {
                         orders: components["schemas"]["Order"][];
+                        page?: number;
+                        hasNext?: boolean;
                     };
                 };
             };
@@ -623,6 +729,55 @@ export interface operations {
                 };
             };
             404: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    getOrderCancellation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The saved cancellation. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Cancellation"];
+                };
+            };
+            404: components["responses"]["Error"];
+            default: components["responses"]["Error"];
+        };
+    };
+    putOrderCancellation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orderId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    reason: string;
+                    expectedVersion: components["schemas"]["MoneyMinor"];
+                };
+            };
+        };
+        responses: {
+            200: components["responses"]["Cancellation"];
+            201: components["responses"]["Cancellation"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
             default: components["responses"]["Error"];
         };
     };

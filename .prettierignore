@@ -8,3 +8,7 @@ test-results
 playwright-report
 src/shared/api/generated
 src/server/adapters/java/generated
+
+# OpenAPI copies from the Java checkout.
+contracts/java/catalog-v1.yaml
+contracts/java/order-v1.yaml

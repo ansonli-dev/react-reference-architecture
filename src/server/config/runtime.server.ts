@@ -10,68 +10,66 @@ const origin = z
 
 const appOrigin = origin.default('http://127.0.0.1:3000');
 
+function isLoopback(value: string): boolean {
+  return ['127.0.0.1', '[::1]', 'localhost'].includes(new URL(value).hostname);
+}
+
 const demoEnv = z.object({
-  APP_ORIGIN: appOrigin.refine((value) =>
-    ['127.0.0.1', '[::1]', 'localhost'].includes(new URL(value).hostname),
-  ),
+  APP_ORIGIN: appOrigin.refine(isLoopback),
   DEMO_DATA_DIR: demoDataDir.optional(),
 });
 
-const categories = z
+const realmUrl = z
   .string()
-  .transform((input, context): unknown => {
-    try {
-      return JSON.parse(input);
-    } catch {
-      context.addIssue({ code: 'custom', message: 'Expected a JSON array' });
-      return z.NEVER;
-    }
-  })
-  .pipe(
-    z
-      .array(
-        z
-          .string()
-          .min(1)
-          .max(80)
-          .refine((value) => value === value.trim()),
-      )
-      .max(100)
-      .refine((values) => new Set(values).size === values.length),
-  )
-  .default([]);
-
-const releaseEnv = z.object({
-  APP_ORIGIN: appOrigin,
-  JAVA_CONTRACT: z.enum(['v1-catalog', 'v2-integrated']).default('v1-catalog'),
-  JAVA_CATALOG_BASE_URL: origin.optional(),
-  JAVA_CATALOG_TOKEN: z
-    .string()
-    .regex(/^[!-~]+$/)
-    .optional(),
-  CATALOG_CATEGORIES_JSON: categories,
-});
-
-const v2Env = z.object({
-  JAVA_CATALOG_BASE_URL: origin,
-  OIDC_ISSUER: z.url({ protocol: /^https?$/ }).refine((value) => {
+  .regex(/^https?:\/\/[^\s\\?#]+$/)
+  .pipe(z.url({ protocol: /^https?$/ }))
+  .refine((value) => {
     const url = new URL(value);
-    return !url.username && !url.password && !url.search && !url.hash;
-  }),
-  AUTH_DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
-});
+    return !url.username && !url.password;
+  })
+  .transform((value) => new URL(value).href.replace(/\/$/, ''));
+
+const releaseEnv = z
+  .object({
+    APP_ORIGIN: appOrigin,
+    JAVA_CATALOG_BASE_URL: origin,
+    JAVA_ORDER_BASE_URL: origin,
+    AUTH_DATABASE_URL: z.url({ protocol: /^postgres(?:ql)?$/ }),
+    OIDC_ISSUER: realmUrl,
+    OIDC_INTERNAL_BASE_URL: realmUrl.optional(),
+    OIDC_CLIENT_ID: z.string().trim().min(1).default('bookstore-bff'),
+    OIDC_CLIENT_SECRET: z.string().regex(/^[!-~]+$/),
+  })
+  .refine((env) => {
+    const originIsSecure = env.APP_ORIGIN.startsWith('https:');
+    const issuerIsSecure = env.OIDC_ISSUER.startsWith('https:');
+    if (
+      (!originIsSecure && !isLoopback(env.APP_ORIGIN)) ||
+      (!issuerIsSecure && !isLoopback(env.OIDC_ISSUER))
+    )
+      return false;
+
+    const privateRealm = env.OIDC_INTERNAL_BASE_URL ?? env.OIDC_ISSUER;
+    return (
+      privateRealm.startsWith('https:') || (!originIsSecure && !issuerIsSecure)
+    );
+  });
 
 export type Profile = 'demo' | 'release';
+export type ReleaseConfig = {
+  profile: 'release';
+  appOrigin: string;
+  javaCatalogBaseUrl: string;
+  javaOrderBaseUrl: string;
+  authDatabaseUrl: string;
+  oidcIssuer: string;
+  oidcInternalBaseUrl: string;
+  oidcClientId: string;
+  oidcClientSecret: string;
+};
+
 export type RuntimeConfig =
-  | { profile: 'demo'; appOrigin: string; dataDir?: string }
-  | {
-      profile: 'release';
-      appOrigin: string;
-      javaContract: 'v1-catalog' | 'v2-integrated';
-      javaCatalogBaseUrl?: string;
-      javaCatalogToken?: string;
-      catalogCategories: string[];
-    };
+  { profile: 'demo'; appOrigin: string; dataDir?: string } | ReleaseConfig;
 
 export function parseRuntimeEnv(
   env: Readonly<Record<string, string | undefined>>,
@@ -88,20 +86,18 @@ export function parseRuntimeEnv(
   }
 
   const parsed = releaseEnv.safeParse(env);
-  if (
-    !parsed.success ||
-    (parsed.data.JAVA_CONTRACT === 'v2-integrated' &&
-      !v2Env.safeParse(env).success)
-  ) {
-    throw new Error('Invalid runtime configuration');
-  }
+  if (!parsed.success) throw new Error('Invalid runtime configuration');
   return {
     profile,
     appOrigin: parsed.data.APP_ORIGIN,
-    javaContract: parsed.data.JAVA_CONTRACT,
     javaCatalogBaseUrl: parsed.data.JAVA_CATALOG_BASE_URL,
-    javaCatalogToken: parsed.data.JAVA_CATALOG_TOKEN,
-    catalogCategories: parsed.data.CATALOG_CATEGORIES_JSON,
+    javaOrderBaseUrl: parsed.data.JAVA_ORDER_BASE_URL,
+    authDatabaseUrl: parsed.data.AUTH_DATABASE_URL,
+    oidcIssuer: parsed.data.OIDC_ISSUER,
+    oidcInternalBaseUrl:
+      parsed.data.OIDC_INTERNAL_BASE_URL ?? parsed.data.OIDC_ISSUER,
+    oidcClientId: parsed.data.OIDC_CLIENT_ID,
+    oidcClientSecret: parsed.data.OIDC_CLIENT_SECRET,
   };
 }
 

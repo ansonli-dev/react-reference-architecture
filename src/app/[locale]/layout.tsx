@@ -1,10 +1,12 @@
 import { Suspense } from 'react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { connection } from 'next/server';
 import { BookOpen, Library, ReceiptText, ShoppingBag } from 'lucide-react';
 import { hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { routing } from '@/i18n/routing';
+import { routing, type Locale } from '@/i18n/routing';
+import { javaLoginHref, readJavaSession } from '@/server/auth.server';
 import { ThemeSwitch } from '@/shared/ui/theme-switch';
 import { LanguageSwitch } from './language-switch';
 import { SkipLink } from './skip-link';
@@ -61,25 +63,12 @@ export default async function LocaleLayout({
                 />{' '}
                 {t('books')}
               </StoreLink>
-              {shop && (
-                <>
-                  <StoreLink href={'/' + locale + '/cart'}>
-                    <ShoppingBag
-                      size={16}
-                      aria-hidden
-                      className="hidden min-[480px]:block"
-                    />{' '}
-                    {t('cart')}
-                  </StoreLink>
-                  <StoreLink href={'/' + locale + '/orders'}>
-                    <ReceiptText
-                      size={16}
-                      aria-hidden
-                      className="hidden min-[480px]:block"
-                    />{' '}
-                    {t('orders')}
-                  </StoreLink>
-                </>
+              {shop ? (
+                <ShopLinks locale={locale} />
+              ) : (
+                <Suspense fallback={null}>
+                  <IntegratedLinks locale={locale} />
+                </Suspense>
               )}
               <Suspense
                 fallback={
@@ -106,5 +95,57 @@ export default async function LocaleLayout({
         </main>
       </body>
     </html>
+  );
+}
+
+async function ShopLinks({ locale }: { locale: Locale }) {
+  const t = await getTranslations({ locale, namespace: 'Shell' });
+  return (
+    <>
+      <StoreLink href={'/' + locale + '/cart'}>
+        <ShoppingBag
+          size={16}
+          aria-hidden
+          className="hidden min-[480px]:block"
+        />{' '}
+        {t('cart')}
+      </StoreLink>
+      <StoreLink href={'/' + locale + '/orders'}>
+        <ReceiptText
+          size={16}
+          aria-hidden
+          className="hidden min-[480px]:block"
+        />{' '}
+        {t('orders')}
+      </StoreLink>
+    </>
+  );
+}
+
+async function IntegratedLinks({ locale }: { locale: Locale }) {
+  await connection();
+  const t = await getTranslations({ locale, namespace: 'Shell' });
+  const session = await readJavaSession();
+  const books = '/' + locale + '/books';
+  const link =
+    'text-muted hover:bg-accent inline-flex min-h-11 items-center rounded-md px-2 text-sm font-semibold sm:px-3';
+  return (
+    <>
+      <ShopLinks locale={locale} />
+      {session ? (
+        <form
+          method="post"
+          action={'/api/auth/logout?returnTo=' + encodeURIComponent(books)}
+        >
+          <button type="submit" className={link}>
+            {t('signOut')}
+          </button>
+        </form>
+      ) : (
+        <a href={javaLoginHref(books)} className={link}>
+          {t('signIn')}
+        </a>
+      )}
+    </>
   );
 }

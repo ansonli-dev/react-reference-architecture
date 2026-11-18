@@ -5,3 +5,4 @@
 | [ADR 0001 应用与工程基线](0001-application-baseline.md)      | 用 App Router 承担路由与渲染，按 feature 组织业务，并约束模块和执行环境的依赖方向。 |
 | [ADR 0002 公开读取与缓存](0002-public-reads-and-cache.md)    | 页面与同源 HTTP 接口共享服务端读取，限制公开列表缓存的适用范围。                    |
 | [ADR 0003 前端模块组合](0003-frontend-module-composition.md) | 按业务共置，按运行环境划分公开入口，在装配层选择目录适配器。                        |
+| [ADR 0004 Java 集成结算](0004-java-integrated-checkout.md)   | BFF 保存账户草稿，Java Order 保存报价、提交和订单。                                 |

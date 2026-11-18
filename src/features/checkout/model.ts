@@ -25,6 +25,10 @@ export const checkoutNoticeSchema = z.enum([
   'empty',
   'total',
   'unavailable',
+  'signIn',
+  'email',
+  'intake',
+  'currency',
   'quoteMissing',
   'expired',
   'consumed',
@@ -44,6 +48,10 @@ export const checkoutErrorCodes = {
   empty: 'CART_EMPTY',
   total: 'AMOUNT_OUT_OF_RANGE',
   unavailable: 'CATALOG_UNAVAILABLE',
+  signIn: 'UNAUTHENTICATED',
+  email: 'EMAIL_UNVERIFIED',
+  intake: 'INTAKE_CLOSED',
+  currency: 'UNSUPPORTED_CURRENCY',
   quoteMissing: 'RESOURCE_NOT_FOUND',
   expired: 'QUOTE_EXPIRED',
   consumed: 'QUOTE_CONSUMED',
@@ -70,6 +78,36 @@ export type DemoOrder = {
   createdAt: string;
   lines: OrderLine[];
 };
+export const orderStatusSchema = z.enum([
+  'PENDING',
+  'PLACED',
+  'CONFIRMED',
+  'SHIPPED',
+  'CANCELLED',
+]);
+export type StoreOrder = Omit<DemoOrder, 'createdAt'> & {
+  createdAt: string | null;
+  status?: z.infer<typeof orderStatusSchema>;
+  version?: number;
+};
+const ordersPageSchema = z
+  .string()
+  .regex(/^[1-9][0-9]{0,2}$/)
+  .transform(Number)
+  .pipe(z.int().max(100))
+  .default(1);
+export function parseOrdersPage(value: unknown) {
+  return ordersPageSchema.safeParse(value).data;
+}
+export type OrderPage = {
+  orders: StoreOrder[];
+  page?: number;
+  hasNext?: boolean;
+};
+export const orderCancellationInput = z.strictObject({
+  reason: z.string().trim().min(1).max(200),
+  expectedVersion: z.int().nonnegative(),
+});
 export type OrderQuote = {
   quoteId: string;
   expiresAt: string;

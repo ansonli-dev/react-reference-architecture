@@ -4,6 +4,8 @@
 
 本地 demo 的加购、购物车更新和结算走 BFF 的资源接口。请求用 HttpOnly Cookie 识别浏览器，同源校验通过后才写 SQLite。详情页加购用条目的 `ETag` 做有条件的 `PUT`，避免同一购物车的并发写入覆盖数量。结算从购物车生成有期限的报价，再以报价和幂等键提交。提交记录、库存扣减、订单快照与购物车清理在同一事务写入，随后公开目录缓存重新读取库存。购物车、报价、提交和订单记录按浏览器读取，响应采用 `Cache-Control: no-store`。[本地购书接口](architecture-spec.md#本地购书接口)
 
+发布模式接入 Java v1，用 Keycloak 建立账户会话。公开目录从 Java Catalog 读取，私有订单按客户 JWT 访问 Java Order。BFF PostgreSQL 保存购物车草稿和报价与草稿行版本的关联。提交进入 `PLACED` 后，BFF 仅删除版本仍与报价一致的行。失败和处理中状态保留草稿。[Java 集成 ADR](../adr/0004-java-integrated-checkout.md)
+
 ## 页面与同源 HTTP 接口
 
 ```mermaid
@@ -41,5 +43,5 @@ SSR 描述 HTML 在哪里生成。React Server Component（RSC）描述组件在
 | 页面语言               | URL 路径中的 `[locale]`。布局据此选择词典并设置文档语言。         | [语言路由](../../src/i18n/routing.ts) · [布局](../../src/app/%5Blocale%5D/layout.tsx)    |
 | 已提交的筛选条件和页码 | URL 查询字符串。直接访问、刷新和后退都以 URL 为准。               | [目录链接](../../src/features/catalog/ui/links.ts)                                       |
 | 尚未提交的筛选输入     | 表单自身。应用筛选时改写 URL 并回到第一页。                       | [筛选表单](../../src/features/catalog/ui/catalog-filters.tsx)                            |
-| 目录结果与详情         | 服务端读取器。常用的公开结果可由页面和 BFF 复用。                 | [公开读取与缓存 ADR](../adr/0002-public-reads-and-cache.md)                              |
+| 目录结果与详情         | 服务端读取器。页面与 BFF 共用读取逻辑，演示模式可缓存常用结果。   | [公开读取与缓存 ADR](../adr/0002-public-reads-and-cache.md)                              |
 | 主题选择               | 浏览器 `localStorage`。通过文档根节点的 `data-theme` 切换语义色。 | [主题开关](../../src/shared/ui/theme-switch.tsx) · [全局样式](../../src/app/globals.css) |
