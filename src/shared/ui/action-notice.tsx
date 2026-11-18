@@ -1,4 +1,4 @@
-export function CatalogNotice({
+export function ActionNotice({
   message,
   href,
   action,

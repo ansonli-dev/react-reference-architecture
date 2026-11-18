@@ -5,26 +5,23 @@ import { connection } from 'next/server';
 import { ChevronLeft, CircleCheck, ShoppingBag } from 'lucide-react';
 import { hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import {
-  BookCover,
-  CatalogNotice,
-  catalogHref,
-  formatBookPrice,
-} from '@/features/catalog/client';
+import { BookCover, catalogHref } from '@/features/catalog/client';
 import {
   parseBookId,
   parseCatalogQuery,
   type CatalogQuery,
 } from '@/features/catalog/model';
 import { CheckoutButton, CheckoutForm } from '@/features/checkout/client';
-import { demoBookDescription } from '@/mocks/fixtures/catalog';
 import { routing } from '@/i18n/routing';
 import { readJavaSession } from '@/server/auth.server';
 import { readBook } from '@/server/catalog.server';
 import { reportCatalogFailure } from '@/server/observability/catalog.server';
 import { ApiFailure } from '@/shared/api/error';
+import { formatPrice } from '@/shared/lib/format-price';
+import { ActionNotice } from '@/shared/ui/action-notice';
 import { CheckoutSignIn } from '../../../checkout-sign-in';
 import Loading from '../loading';
+import { demoBookDescription } from '@/mocks/fixtures/catalog';
 
 type DetailsProps = PageProps<'/[locale]/books/[bookId]'>;
 
@@ -83,7 +80,7 @@ async function BookDetails({ params, searchParams }: DetailsProps) {
         <Link href={back} prefetch={false} className="text-primary underline">
           {t('back')}
         </Link>
-        <CatalogNotice
+        <ActionNotice
           message={t('unavailable')}
           href={catalogHref(base + '/' + id, sourceQuery)}
           action={t('retry')}
@@ -126,7 +123,7 @@ async function BookDetails({ params, searchParams }: DetailsProps) {
               <dl>
                 <dt className="sr-only">{t('price')}</dt>
                 <dd className="text-3xl font-bold tracking-tight tabular-nums">
-                  {formatBookPrice(locale, book)}
+                  {formatPrice(locale, book)}
                 </dd>
               </dl>
               <p className="text-muted inline-flex items-center gap-1.5 text-sm">
