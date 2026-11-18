@@ -199,7 +199,8 @@ export function CheckoutForm({
       const params = new URLSearchParams({ notice });
       if (
         operation.type === 'submit' &&
-        (notice === 'unavailable' ||
+        (notice === 'signIn' ||
+          notice === 'unavailable' ||
           notice === 'processing' ||
           notice === 'reconcile')
       ) {

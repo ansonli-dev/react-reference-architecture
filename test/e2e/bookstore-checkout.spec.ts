@@ -101,6 +101,68 @@ test('reloads the latest cart when a stale tab updates or removes a line', async
   ).toHaveValue('2');
 });
 
+for (const method of ['POST', 'GET']) {
+  test(`keeps the same quote after a checkout ${method} returns 401`, async ({
+    page,
+  }, info) => {
+    test.skip(!['demo', 'dev'].includes(info.project.name));
+    await page.goto('/en/books/00000000-0000-4000-8000-000000000104');
+    await page.getByRole('button', { name: 'Add to cart' }).click();
+    await page.getByRole('button', { name: 'Review quote' }).click();
+    await expect(page).toHaveURL(/\/en\/cart\?quote=[a-f0-9-]+$/);
+    const quoteId = new URL(page.url()).searchParams.get('quote');
+
+    await page.route(
+      /\/api\/v1\/order-submissions(?:\/[^/]+)?$/,
+      async (route) => {
+        if (route.request().method() === method) {
+          return route.fulfill({
+            status: 401,
+            json: {
+              error: {
+                code: 'UNAUTHENTICATED',
+                requestId: crypto.randomUUID(),
+              },
+            },
+          });
+        }
+        // Let the real Demo POST place the order, then simulate an accepted response.
+        const response = await route.fetch();
+        if (response.status() !== 201) return route.fulfill({ response });
+        const { submissionId } = await response.json();
+        return route.fulfill({
+          status: 202,
+          headers: { Location: response.headers().location },
+          json: { submissionId, state: 'PROCESSING' },
+        });
+      },
+    );
+
+    await page.getByRole('button', { name: 'Place demo order' }).click();
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === '/en/cart' &&
+        url.searchParams.get('quote') === quoteId &&
+        url.searchParams.get('notice') === 'signIn',
+    );
+    const main = page.getByRole('main');
+    await expect(main.getByRole('alert')).toContainText('session ended');
+    await expect(
+      main.getByRole('heading', { name: 'Confirm quote' }),
+    ).toBeVisible();
+
+    await page.getByRole('link', { name: '中文' }).click();
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === '/zh-CN/cart' &&
+        url.searchParams.get('quote') === quoteId &&
+        url.searchParams.get('notice') === 'signIn',
+    );
+    await expect(main.getByRole('alert')).toContainText('结算会话已结束');
+    await expect(main.getByRole('button', { name: '演示下单' })).toBeVisible();
+  });
+}
+
 test('shops from the bilingual storefront, changes quantity, places an order and sees only its own history', async ({
   page,
   browser,

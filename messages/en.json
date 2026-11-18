@@ -84,6 +84,7 @@
       "empty": "There are no books to order in this currency.",
       "total": "This subtotal is too large. Reduce the quantity and try again.",
       "unavailable": "The bookstore is temporarily unavailable. Try again.",
+      "signIn": "Your checkout session ended. Review your quote and try again.",
       "quoteMissing": "This quote is unavailable. Review your cart and get a new quote.",
       "expired": "This quote has expired. Get a new quote.",
       "consumed": "This quote was already submitted. Check your orders.",
@@ -98,6 +99,7 @@
       "add": "Sign in to add this book to your cart.",
       "cart": "Sign in to view your saved cart.",
       "orders": "Sign in to view your order history.",
+      "resume": "Your checkout session ended. Sign in again to continue with this quote.",
       "continue": "Sign in to continue"
     },
     "placeLiveOrder": "Place order",

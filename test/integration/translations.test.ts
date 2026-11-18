@@ -1,5 +1,6 @@
 import { createTranslator, type AbstractIntlMessages } from 'next-intl';
 import { expect, test } from 'vitest';
+import { checkoutNoticeSchema } from '@/features/checkout/model';
 import en from '../../messages/en.json';
 import zhCN from '../../messages/zh-CN.json';
 
@@ -12,6 +13,24 @@ function messagePaths(messages: AbstractIntlMessages, prefix = ''): string[] {
 
 test('both locales define the same message keys, including nested messages', () => {
   expect(messagePaths(zhCN).sort()).toEqual(messagePaths(en).sort());
+});
+
+test.each([
+  ['en', en],
+  ['zh-CN', zhCN],
+] as const)('renders every checkout notice in %s', (locale, messages) => {
+  const t = createTranslator({
+    locale,
+    messages,
+    namespace: 'Checkout.notices',
+    onError(error) {
+      throw error;
+    },
+  });
+
+  for (const notice of checkoutNoticeSchema.options) {
+    expect(t(notice).trim()).not.toBe('');
+  }
 });
 
 test.each([

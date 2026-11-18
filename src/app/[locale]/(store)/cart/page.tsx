@@ -65,6 +65,15 @@ async function CartContent({
   let notice = checkoutNoticeSchema.safeParse(rawNotice).data;
   const returnTo =
     '/' + locale + '/cart' + (quoteId ? '?quote=' + quoteId : '');
+  if (notice === 'signIn' && process.env.BOOKSTORE_BUILD_PROFILE === 'release')
+    return (
+      <CheckoutSignIn
+        locale={locale}
+        returnTo={returnTo}
+        intent={quoteId ? 'resume' : 'cart'}
+      />
+    );
+
   let groups: CartGroup[];
   let quote: OrderQuote | null = null;
   try {
