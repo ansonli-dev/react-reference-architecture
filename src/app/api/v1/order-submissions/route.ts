@@ -16,5 +16,5 @@ export function POST(request: Request) {
     return apiJson(submission, status, {
       Location: '/api/v1/order-submissions/' + submission.submissionId,
     });
-  });
+  }, 'api.checkout.submission.create');
 }

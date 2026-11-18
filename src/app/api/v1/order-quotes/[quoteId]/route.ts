@@ -14,5 +14,5 @@ export function GET(
     const id = parseResourceId((await params).quoteId);
     const shop = await readShop();
     return apiJson(requireResource(await shop.quote(id)));
-  });
+  }, 'api.checkout.quote.read');
 }
