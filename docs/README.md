@@ -9,3 +9,7 @@
 | [运行与发布手册](operations/run-and-release.md) | 模式配置、构建验证、镜像发布和切回上一版本。       |
 
 按目的选择文档：从根目录 README 入手，按手册执行操作，遇到边界问题查规范，理解取舍时读 ADR。组织方式参考 [Diátaxis](https://diataxis.fr/)。
+
+[参考示例评审](architecture/reference-example-review.md)记录书店案例的适用条件、验证范围和待改进事项。
+
+[参考示例改进计划](superpowers/plans/2026-11-18-reference-example-improvements.md)列出改进顺序和验收标准。
