@@ -1,34 +1,52 @@
 # React Reference Architecture
 
-「页间书店」是一个 React 前端架构参考实现，展示如何按业务组织代码、在服务端渲染页面，并通过同源 BFF 完成浏览目录、加购、报价、下单和查看订单。
+「页间书店」是一个以服务端渲染为主的 React 应用。代码按目录和结算两个业务模块组织，Next.js App Router 将它们组合成页面。浏览书目时，页面直接在服务端读取数据。修改购物车或确认报价时，浏览器通过同源 HTTP 接口提交变更。
 
-## 架构案例
+## 架构总图
 
-- **首屏读取与独立 HTTP 调用。** 目录页在 RSC 中读取数据，HTTP 调用方通过 Route Handler 读取 JSON。两个入口共用服务端读取器。[案例说明](docs/architecture/overview.md#页面首屏与独立-http-调用) · [目录页](<src/app/%5Blocale%5D/(store)/books/page.tsx>) · [目录接口](src/app/api/v1/catalog/books/route.ts) · [书目一致用例](test/e2e/catalog-journey.spec.ts#L53) · [流式外壳用例](test/e2e/catalog-journey.spec.ts#L279)
-- **筛选、表单与交易状态放在哪里？** 已提交的筛选在 URL，未提交的输入在表单，购物车与报价由服务端按会话读取。[案例说明](docs/architecture/overview.md#渲染与状态归属) · [筛选表单](src/features/catalog/ui/catalog-filters.tsx) · [报价确认入口](<src/app/%5Blocale%5D/(store)/cart/page.tsx>) · [筛选导航用例](test/e2e/catalog-journey.spec.ts#L69) · [报价刷新用例](test/e2e/bookstore-checkout.spec.ts#L210) · [交易资源隔离用例](test/e2e/bookstore-checkout-http.spec.ts#L129)
-- **并发写入与异步结算。** 购物车用版本保护写入，报价固定交易输入，提交可用同一个幂等键重试并单独查询状态。[案例说明](docs/architecture/overview.md#并发写入与异步结算) · [条目接口](src/app/api/v1/cart/items/%5BbookId%5D/route.ts) · [提交接口](src/app/api/v1/order-submissions/route.ts) · [购物车冲突与结算用例](test/e2e/bookstore-checkout.spec.ts)
+```mermaid
+flowchart TB
+    accTitle: 页间书店的前端请求路径
+    accDescr: 浏览器通过页面导航读取内容，通过同源接口提交交易。两条路径在服务端使用目录读取与购书逻辑，由适配器访问数据。
+    subgraph Browser["浏览器"]
+        Filter["目录筛选表单"]
+        Checkout["购物车与结算交互"]
+    end
+    subgraph Next["Next.js 服务端"]
+        Page["服务端页面（RSC）"]
+        API["同源 API（Route Handlers）"]
+        Catalog["目录读取器"]
+        Shop["购物车与订单"]
+        Adapters["数据适配器（按运行模式选择）"]
+        Page -->|读取书目| Catalog
+        Page -->|读取购物车、报价和订单| Shop
+        API -->|查询书目| Catalog
+        API -->|交易读写| Shop
+        Catalog --> Adapters
+        Shop --> Adapters
+    end
+    Filter -->|URL 导航| Page
+    Checkout -->|购物车与结算请求| API
+    Caller["独立 HTTP 调用方"] -->|目录 JSON 请求| API
+```
+
+## 架构导读
+
+| 章节                                                                             | 在书店里解决什么问题                                                     |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| [业务模块与页面组合](docs/architecture/overview.md#业务模块与页面组合)           | 购物车需要目录的书封。页面组合两个模块，各自维护展示与交易规则。         |
+| [服务端渲染与客户端交互](docs/architecture/overview.md#服务端渲染与客户端交互)   | 书目读取较慢时，服务端先发页面标题。读者提交筛选时，浏览器再发起导航。   |
+| [状态归属与恢复](docs/architecture/overview.md#状态归属与恢复)                   | 输入中的关键词留在表单里，已提交的筛选可用链接分享，私有报价按会话恢复。 |
+| [数据入口、适配器与缓存](docs/architecture/overview.md#页面首屏与独立-http-调用) | 页面和 JSON 接口共用目录读取器，由读取器选择数据源及缓存策略。           |
+| [并发写入与异步结算](docs/architecture/overview.md#并发写入与异步结算)           | 两个标签页改同一条目时校验版本。下单响应丢失时，用同一报价重试。         |
+| [从筛选书目到确认订单](docs/architecture/overview.md#从筛选书目到确认订单)       | 沿一次购书流程追踪查询、购物车版本与报价 ID，看各部分如何衔接。          |
 
 ## 本地启动
 
-Demo 按浏览器会话保存购物车，按币种报价，并在 SQLite 事务内同步落单和扣减库存。
+使用 Node.js 24 和 pnpm 11.25.0 即可独立运行书店。下图是演示书店的中文目录。顶部表单承接筛选输入，下方书卡展示本页书目的价格与库存。[本地启动命令](docs/operations/run-and-release.md#本地演示)
 
-使用 Node 24 和 pnpm 11.25.0。在仓库根目录初始化 SQLite 演示数据并启动前端。
+![中文书籍目录，搜索和分类表单下方展示书封、价格与库存](docs/screenshots/catalog.png)
 
-```bash
-pnpm install --frozen-lockfile
-export DEMO_DATA_DIR="$PWD/.bookstore-demo"
-pnpm demo:seed
-pnpm dev:mock
-```
+## 文档
 
-打开 [中文书籍目录](http://127.0.0.1:3000/zh-CN/books) 或 [英文书籍目录](http://127.0.0.1:3000/en/books)。
-
-![Demo 模式的页间书店目录](docs/screenshots/catalog.png)
-
-上图为 Demo 模式。
-
-## Java 集成
-
-Release 接入 Java v1 目录和订单 API，通过 Keycloak 登录。书店账号页支持自助注册和邮件找回密码，登录后回到发起页面。BFF 在 PostgreSQL 中按账户保存购物车草稿，Java Order 生成人民币报价并处理可能异步的提交，目录从 Java 读取当前库存。[配置与启动](docs/operations/run-and-release.md#java-集成)
-
-[架构与开发文档](docs/README.md) · [API 契约](contracts/java/README.md) · [测试入口](docs/testing-strategy/README.md#运行入口)
+[文档索引](docs/README.md) · [运行与发布](docs/operations/run-and-release.md) · [测试入口](docs/testing-strategy/README.md#运行入口)

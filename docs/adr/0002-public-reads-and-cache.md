@@ -4,15 +4,22 @@
 
 ## 背景
 
-目录页面与同源 HTTP 接口会读取相同的公开结果。查询参数含自由文本和页码，若全量缓存，冷门参数可能生成大量难以复用的键。浏览器接收的 HTTP 响应和应用在服务端复用的结果也有不同的缓存边界。
+目录页和目录 JSON 接口都能按分类、关键词和页码取书。各自决定如何取数据，会让两个入口对同一查询给出不同结果。缓存所有查询又会留下大量只用过一次的关键词和页码。库存变化还要求应用明确哪些结果需要重新读取。
 
 ## 决策
 
-- 页面直接调用服务端目录读取器。Route Handler 将校验后的输入交给同一入口，并为 HTTP 响应设置 `Cache-Control: no-store`。[目录读取器](../../src/server/catalog.server.ts) · [HTTP 响应](../../src/server/http/response.server.ts)
-- 演示模式缓存前十页中无关键词的列表读取，且分类为空或属于当前目录。自由文本、未知分类和更深的页码绕过列表缓存。合法的书籍 UUID 可用于详情缓存。
-- 缓存参数按数据集、locale 和规范化后的查询或 UUID 隔离。缓存只持有公开结果。列表与详情使用各自的标签，`cacheLife` 配置为 `stale: 0`、`revalidate: 60`、`expire: 300` 秒。[Next.js cacheLife](https://nextjs.org/docs/app/api-reference/functions/cacheLife)
-- 发布模式直接读取 Java Catalog 当前的书目、分类和库存。
+两个入口分别解析输入，再调用同一个服务端目录读取器。独立的 HTTP 调用收到 `Cache-Control: no-store`。服务端能否复用底层的公开读取结果，由读取器按运行模式决定。[目录页](<../../src/app/%5Blocale%5D/(store)/books/page.tsx>) · [目录接口](../../src/app/api/v1/catalog/books/route.ts) · [HTTP 响应](../../src/server/http/response.server.ts)
+
+| 读取     | 演示模式                                                         | 发布模式                     |
+| -------- | ---------------------------------------------------------------- | ---------------------------- |
+| 目录列表 | 仅缓存前十页、无关键词且分类为空或有效的列表。其余查询直接读取。 | 每次从目录服务读取当前页。   |
+| 书籍详情 | 以合法书籍 ID 缓存详情。                                         | 每次从目录服务读取当前详情。 |
+| 分类     | 直接读取。具名分类在进入列表缓存前，还要确认该分类存在。         | 直接读取。                   |
+
+演示缓存按数据目录的摘要和语言隔离，再以规范化的列表查询或书籍 ID 区分结果。列表共用一个标签，详情按书籍 ID 标记。演示结算成功提交后，服务端立即让列表标签和涉及书籍的详情标签过期，以便后续读取体现库存扣减。缓存期限配置为 `stale: 0`、`revalidate: 60`、`expire: 300` 秒。[目录读取与失效](../../src/server/catalog.server.ts) · [结算提交](../../src/server/shop.server.ts) · [Next.js cacheLife](https://nextjs.org/docs/app/api-reference/functions/cacheLife)
 
 ## 取舍
 
-缓存常用的公开读取可减少演示模式的重复调用，页面可能短时间显示先前结果。限制列表缓存的参数范围控制了缓存键的规模。发布构建的 HTTP 与页面用例验证当前库存和上游读取。[页面用例](../../test/e2e/catalog-journey.spec.ts) · [HTTP 用例](../../test/e2e/catalog-http.spec.ts)
+演示模式以有限的缓存键换取常用页面和接口之间复用结果的机会，写入库存的路径也因此承担失效责任。发布模式以每次请求的读取成本换取库存新鲜度。购物车、报价、提交和订单都按当前会话读取，属于私有数据。[交易资源隔离用例](../../test/e2e/bookstore-checkout-http.spec.ts#L129)
+
+页面与 JSON 的一致性用例比较相同筛选条件下的书目。发布模式另用目录替身计数，核对每次详情访问都发出了读取请求。演示用例则在成交后重新读书籍详情，核对库存只减少一次。要确认页面与接口之间的一次读取是否实际命中演示缓存，还需对相同语言和查询下的底层读取计数。[书目一致](../../test/e2e/catalog-journey.spec.ts#L53) · [发布读取次数](../../test/e2e/catalog-journey.spec.ts#L322) · [演示成交后库存](../../test/e2e/bookstore-checkout-http.spec.ts#L115)

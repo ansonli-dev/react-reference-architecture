@@ -1,5 +1,7 @@
 # React 架构参考示例改进规格
 
+本规格对应已合入的 [PR #10](https://github.com/ansonli-dev/react-reference-architecture/pull/10)，保留当时的设计依据。当前的架构说明见[前端架构概览](../../architecture/overview.md)。
+
 「页间书店」集中展示三个读者需要作出的架构决定。每个案例用仓库已有场景说明问题、方案、适用条件和可查证的结果。目录和购书流程提供完整的业务前提，便于比较这些决定在两种运行模式下产生的结果。[评审依据](../../architecture/reference-example-review.md)
 
 ## 案例与取舍

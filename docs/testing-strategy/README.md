@@ -1,50 +1,32 @@
 # 前端测试体系
 
-测试层级描述用例需要启动哪些模块和运行环境。测试类型描述它要发现哪一类问题。例如筛选功能可以在组件集成层测，跳过导航后的键盘焦点需要在浏览器测，JSON 字段在同源 HTTP 边界测。
+目录页和同源 API 应当给出一致的书目，筛选条件应当经得起刷新和后退，同一笔结算在重试时应当只扣一次库存。这些承诺涉及不同的边界。书店用模型和组件测试定位输入与交互问题，用生产构建验证页面和 HTTP 行为，用独立联调核对账户与交易的最终结果。
 
-## 依据与分层
+## 业务模块的依赖方向
 
-模板以静态检查为底座，运行时用例分为单元测试、集成测试和浏览器端到端测试。
+购物车页可以在应用层组合目录的书封与结算的视图，两个 feature 之间直接导入则会让它们一起变化。`pnpm check` 对真实源码检查公开入口和依赖方向。另有一组很小的反例专门测试规则本身，覆盖跨 feature 导入、绕过公开入口，以及客户端经中间模块引入服务端代码。纯类型导入也有单独的正例。[架构规范](../architecture/architecture-spec.md#公开入口与依赖方向) · [规则与反例](../../test/unit/architecture.test.ts)
 
-Martin Fowler 的测试金字塔根据验证范围组织套件。范围较小的测试提供快速反馈，较大的测试验证多个部分一起运行时的行为。Ham Vocke 提倡把能够在较小范围准确复现的问题放到较低层，把浏览器用例留给只有完整运行环境才能验证的行为。本模板用这个原则选择用例粒度。[Martin Fowler · Test Pyramid](https://martinfowler.com/bliki/TestPyramid.html) · [Ham Vocke · The Practical Test Pyramid](https://martinfowler.com/articles/practical-test-pyramid.html#avoid-test-duplication)
+## 同一个筛选条件经过哪些边界
 
-集成范围可以窄到一个边界。目录表单与 URL 生成的协作可以挂载真实组件，只替换导航入口。验证异步 Server Components、流式输出和页面导航时，运行 Next.js 的生产构建。[Martin Fowler · Integration Test](https://martinfowler.com/bliki/IntegrationTest.html) · [Next.js · Vitest](https://nextjs.org/docs/app/guides/testing/vitest) · [Next.js · Playwright](https://nextjs.org/docs/app/guides/testing/playwright#running-your-playwright-tests)
+| 问题                     | 怎样观察结果                                                                                                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 查询规则是否正确？       | 直接调用目录模型，验证缺省页码为 1，第 100 页有效，第 101 页和重复页码会被拒绝。[查询模型测试](../../test/unit/catalog-query.test.ts)                                                       |
+| 浏览器何时改变 URL？     | 挂载真实筛选表单，只替换路由的 `push`。编辑关键词时导航调用数为零，点击提交后才得到正确编码的 URL，并回到第一页。[组件集成测试](../../test/integration/catalog-filters.test.tsx)            |
+| 用户能否恢复相同的目录？ | 在生产构建中直接打开筛选地址、翻页并后退，检查地址、表单和结果。另用同一组筛选条件请求页面与 JSON 接口，比较书名。[目录导航与接口一致性](../../test/e2e/catalog-journey.spec.ts)            |
+| 较慢的读取是否阻塞首屏？ | 给发布模式的目录替身设置延迟，逐块读取真实 HTML 响应。先到的内容含标题和加载提示，随后才出现目标书名。这里验证的是响应交付顺序。[流式响应用例](../../test/e2e/catalog-journey.spec.ts#L279) |
 
-| 层级             | 测什么                                                        | 怎么测                                                                                                                           | 本仓库示例                                                                                                                                                               |
-| ---------------- | ------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 静态检查         | 类型、代码规范、模块依赖方向和契约生成一致性。                | 用 TypeScript、Lint、Prettier、依赖检查和代码生成校验，直接检查源码和产物。                                                      | [依赖规则](../../.dependency-cruiser.cjs) · [架构检查](../../scripts/check-boundaries.mjs) · [契约生成](../../scripts/generate-api.mjs)                                  |
-| 单元测试         | 单个规则的输入、输出与边界值。                                | 用 Vitest 直接调用函数。用表驱动输入覆盖合法值、默认值、非法值和边界。                                                           | 目录默认页码、重复参数和第 100 页。[目录查询模型](../../test/unit/catalog-query.test.ts)                                                                                 |
-| 集成测试         | 少量组件或模块能否协作，包括表单提交、翻译格式化和同源 HTTP。 | 用 Testing Library 挂载真实组件。用真实翻译器处理词典。测 HTTP 时向运行中的 Route Handler 发请求，用固定数据和本地替身控制依赖。 | [筛选表单](../../test/integration/catalog-filters.test.tsx) · [双语词典](../../test/integration/translations.test.ts) · [同源 HTTP](../../test/e2e/catalog-http.spec.ts) |
-| 浏览器端到端测试 | 用户能否完成关键任务，包括首屏加载、交互、导航和恢复。        | 用 Playwright 访问生产构建，通过可访问名称定位控件，执行真实浏览器操作，等待页面达到可观察的状态。                               | [目录旅程](../../test/e2e/catalog-journey.spec.ts) · [键盘筛选](../../test/e2e/catalog-keyboard.spec.ts) · [语言与主题](../../test/e2e/shell.spec.ts)                    |
+键盘用例在 Chromium 中检查跳过导航、表单提交和结果区更新。axe 扫描明暗两种主题下的目录，覆盖 WCAG 2.1 A/AA 的自动规则。读屏软件的实际播报仍需人工评估。双语词典测试则直接格式化消息，并检查所有可显示的结算提示在两种语言中都有文案。[键盘导航](../../test/e2e/catalog-keyboard.spec.ts) · [无障碍扫描](../../test/e2e/catalog-accessibility.spec.ts) · [双语词典](../../test/integration/translations.test.ts)
 
-用目录筛选做例子。`page=101` 是否有效，由模型测试验证。填入含空格和 `&` 的关键词后，提交是否生成正确 URL，由组件集成测试确认。按 Tab 跳过页头、进入目录并提交筛选，需要真实浏览器的焦点和导航证据。
+## 结算失败后，核对哪些状态
 
-Playwright 也提供 HTTP 请求客户端。`catalog-http.spec.ts` 借用同一套生产服务启动配置，通过请求客户端验证 HTTP 集成边界。[同源 HTTP](../../test/e2e/catalog-http.spec.ts)
-
-## 测试类型
-
-| 类型           | 测什么                                                 | 怎么测                                                                                                                                                                                                                                                     |
-| -------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 功能与状态     | 正常操作、空结果、输入无效、故障和恢复。               | 对模型断言返回值，对组件断言输入或提交结果，对页面断言可见反馈和 URL。[目录旅程](../../test/e2e/catalog-journey.spec.ts)                                                                                                                                   |
-| HTTP 契约      | 状态码、媒体类型、响应字段和错误形状。                 | 静态检查核对 OpenAPI 生成类型，HTTP 测试请求实际路由并验证代表性 JSON。[BFF 契约](../../contracts/bff/v1.yaml) · [HTTP 用例](../../test/e2e/catalog-http.spec.ts) · [OpenAPI Responses Object](https://spec.openapis.org/oas/v3.1.0#responses-object)      |
-| 国际化         | 词典键、动态参数、语言切换和 URL 状态。                | 在 Vitest 比较嵌套消息键，让真实翻译器格式化页码和库存。在浏览器检查文档语言与切换后的地址。[词典测试](../../test/integration/translations.test.ts) · [语言与主题](../../test/e2e/shell.spec.ts)                                                           |
-| 可访问性       | 可访问名称、控件状态、页面语义、颜色对比度和键盘焦点。 | 用键盘验证跳过导航、焦点顺序和提交。用 axe 扫描目录的明暗主题。[键盘用例](../../test/e2e/catalog-keyboard.spec.ts) · [axe 用例](../../test/e2e/catalog-accessibility.spec.ts)                                                                              |
-| 视觉与响应式   | 页面布局、主题、样式资源及视口溢出。                   | 固定浏览器、视口和数据比较截图。通过实际 CSS 响应、网格样式和视口边界验证布局。[视觉用例](../../test/visual/storefront.spec.ts) · [样式检查](../../test/visual/catalog-styles.spec.ts) · [Playwright 视觉比较](https://playwright.dev/docs/test-snapshots) |
-| 渲染与性能行为 | 加载外壳是否先到达、库存是否及时更新、超时后能否恢复。 | 在可控延迟下读取流式响应，在固定输入下比较底层请求次数，断言超时状态与后续请求结果。[目录旅程](../../test/e2e/catalog-journey.spec.ts) · [HTTP 用例](../../test/e2e/catalog-http.spec.ts)                                                                  |
-| 安全边界       | 请求大小、来源检查和错误信息暴露。                     | 直接构造超限请求、不可接受的来源和带敏感信息的内部错误，检查对外响应。[HTTP 边界单测](../../test/unit/api-boundary.test.ts)                                                                                                                                |
-| 兼容性         | 目标浏览器和设备上的关键交互。                         | 用 Playwright 项目表达浏览器支持范围，按视口检查布局。模板默认运行 Chromium，视觉测试包含桌面与移动视口。[端到端配置](../../playwright.config.ts) · [视觉配置](../../playwright.visual.config.ts)                                                          |
-
-目录的 axe 用例等待书卡渲染、主题生效和 CSS 过渡完成，再扫描整页的 WCAG 2.1 A/AA 自动规则。Chromium 键盘用例验证筛选后继续 Tab、浏览器 Back 恢复、结果状态节点原位更新，以及相同数量的关键词变化。自动用例不测读屏播报；目前未运行真实读屏评估。桌面与移动视口均用 Chromium，未覆盖 Firefox、WebKit 或实体移动设备。[Playwright 无障碍测试](https://playwright.dev/docs/accessibility-testing#scanning-for-wcag-violations)
-
-## 编写用例
-
-- 准备输入、执行动作、断言可观察结果。优先使用角色、可访问名称和表单标签。组件集成只替换要隔离的依赖，例如筛选表单外部的导航。[Testing Library 查询优先级](https://testing-library.com/docs/queries/about/#priority)
-- 给每个用例独立的初始状态。需要模拟慢响应时，在替身设置延迟，用会重试的断言等待页面达到预期状态。[Playwright 测试实践](https://playwright.dev/docs/best-practices)
-- 按失败位置定位问题。模型测试定位解析错误，组件测试定位交互，HTTP 测试定位响应形状，浏览器测试定位生产构建中的真实交互。[The Practical Test Pyramid](https://martinfowler.com/articles/practical-test-pyramid.html#avoid-test-duplication)
+- **旧购物车覆盖新数量。** 两个标签页读到同一条目，再通过 HTTP 将数量更新为 2。旧页面尝试改成 3 或删除时，页面提示购物车已变化，并重新显示数量 2。[跨标签页用例](../../test/e2e/bookstore-checkout.spec.ts#L62)
+- **订单已成交，浏览器却丢了响应。** 演示用例先让真实 SQLite 交易完成，再丢弃首次响应。刷新后用原报价提交，核对两次请求的幂等键、同一条订单记录，以及最终库存只减少一本。[丢响应后重试](../../test/e2e/bookstore-checkout.spec.ts#L387)
+- **订单仍在处理。** 演示交易同步完成，测试可把成功响应替换为 `202 PROCESSING`，观察浏览器是否查询提交资源。持续返回 `PROCESSING` 时核对轮询上限，返回 `RECONCILE_REQUIRED` 时核对页面提示等待核对、停止自动轮询并保留原报价。真实异步受理由独立联调验证。[浏览器状态处理](../../test/e2e/bookstore-checkout.spec.ts) · [真实服务联调](#真实-java-与-keycloak-联调)
+- **接口返回异常。** 浏览器测试注入错误的 `Location`、提交 ID 或超时，检查报价是否仍能恢复。服务端另用可控的依赖错误调用报价与提交入口，核对 5xx 响应和日志共享同一个 `requestId`。[浏览器请求边界](../../test/e2e/checkout-transport.spec.ts) · [服务端故障关联](../../test/unit/checkout-observability.test.ts)
 
 ## 运行入口
 
-安装依赖后，可直接运行静态检查以及 Vitest 的单元与集成测试。只检查筛选表单时，运行 `pnpm test test/integration/catalog-filters.test.tsx`。
+静态检查覆盖类型、格式、Lint 和模块边界。`pnpm api:check` 另行核对契约生成结果。Vitest 运行 `test/unit` 与 `test/integration`，单看筛选表单可用 `pnpm test test/integration/catalog-filters.test.tsx`。[Vitest 配置](../../vitest.config.mts)
 
 ```bash
 pnpm install --frozen-lockfile
@@ -54,7 +36,9 @@ pnpm api:check
 pnpm test
 ```
 
-Playwright 使用 `demo` 和 `release` 生产产物，配置会启动隔离的本地实例和固定数据。可用 `pnpm test:e2e catalog-accessibility.spec.ts` 单独运行目录明暗主题的 axe 检查。普通 E2E 的测试产物写入 `test-results/e2e/`，CI 从同一目录归档失败报告。[Playwright 配置](../../playwright.config.ts) · [CI](../../.github/workflows/ci.yml)
+### 生产构建与同源 HTTP
+
+Playwright 启动演示、发布两种生产构建。演示项目使用隔离的 SQLite 种子，发布项目使用可控的目录服务替身，可观察上游请求次数、注入超时，并检查匿名访问。HTTP 用例直接请求 Route Handler，浏览器用例检查页面上的可见结果。用例按所需环境运行，失败 trace 写入 `test-results/e2e/`。[浏览器配置](../../playwright.config.ts) · [服务启动与替身](../../test/support/run-built-app.mjs) · [HTTP 用例](../../test/e2e/catalog-http.spec.ts)
 
 ```bash
 pnpm build
@@ -64,14 +48,24 @@ unset BOOKSTORE_E2E_DEV
 pnpm test:e2e
 ```
 
-视觉回归用固定的 Linux ARM64 镜像比较截图，报告归档到 `test-results/visual-container/`。失败时查看实际截图和差异，预期的布局改动与基线一起评审。[视觉回归入口](../../scripts/test-visual.sh) · [截图基线](../../test/visual/screenshots)
+发布镜像另由 `bash scripts/test-release.sh` 在 Docker 内部网络中启动，核对存活、就绪、双语目录、静态资源和匿名购物车。`/api/ready` 返回 200 表示运行配置可解析且目录可读。CI 分别运行常规检查、视觉回归和镜像烟测。[镜像烟测](../../scripts/test-release.sh) · [CI 工作流](../../.github/workflows/ci.yml)
+
+### 视觉回归
+
+截图基线使用固定的 Linux ARM64 Playwright 容器、演示种子和 Chromium，覆盖桌面与移动视口的目录，以及深色详情、购物车和订单页。每次运行的结果位于 `test-results/visual-container/run.*/`。预期的视觉改动用 `bash scripts/test-visual.sh --update-snapshots` 生成新图，脚本会再比较一次，并把基线复制回仓库供评审。[视觉配置](../../playwright.visual.config.ts) · [截图基线](../../test/visual/screenshots)
 
 ```bash
 bash scripts/test-visual.sh
 ```
 
-普通 CI 的 Release 端到端测试使用目录替身，覆盖发布构建的目录、匿名访问边界、故障、超时与日志关联。`/api/ready` 检查运行配置可解析、目录可读。镜像烟测用 `bash scripts/test-release.sh` 在内部 Docker 网络验证发布镜像的健康、就绪、目录和静态资源。Demo 用例通过 SQLite 验证真实的订单与库存写入，通过替换同步落单的响应为 `202 PROCESSING` 验证浏览器轮询。[Release HTTP 用例](../../test/e2e/catalog-http.spec.ts) · [匿名访问用例](../../test/e2e/build-profiles.spec.ts) · [镜像构建与运行](../operations/run-and-release.md#构建并运行发布镜像) · [Demo 购书用例](../../test/e2e/bookstore-checkout.spec.ts)
+已有预览可直接检查 CSS 响应、书卡布局和横向溢出。安装 Chromium 后把地址传给 `BOOKSTORE_VISUAL_URL`，此模式只运行桌面和移动视口的样式断言。[样式检查](../../test/visual/catalog-styles.spec.ts)
+
+```bash
+BOOKSTORE_VISUAL_URL=http://127.0.0.1:3000 pnpm test:e2e:visual
+```
 
 ### 真实 Java 与 Keycloak 联调
 
-连接带隔离种子数据的 Java 联调环境后执行 `pnpm test:e2e:java`。这套用例覆盖 Keycloak 登录、邮件验证及密码重置、账户购物车草稿在 PostgreSQL 中的恢复，以及 Java Order 的下单、丢响应重试和两位账户争购最后一本。结算恢复用例模拟一次操作 401，断言原会话还可读报价，并经过真实的 Keycloak 登录回跳再下单。版本清理用例核对同一账户报价之后修改的购物车条目在下单成功和重放后都保留。[Java 集成启动](../operations/run-and-release.md#java-集成) · [浏览器用例](../../test/live-java/checkout.spec.ts)
+这套独立用例使用已运行的发布前端、实际身份服务和订单服务。准备隔离的账户、书目和库存后执行 `pnpm test:e2e:java`。用例会下单并消费种子库存，两人争购的前提是指定书目只剩一本。[联调配置](../../playwright.java.config.ts) · [环境与启动](../operations/run-and-release.md#java-集成)
+
+登录恢复用例注入一次操作 `401`，随后实际经过 Keycloak 回跳，在原报价上手动继续，核对浏览器收到的 BFF `202 PROCESSING`、状态查询和最后生成的订单。另一条用例在报价后修改一行购物车，下单成功及重放后都检查未改动的行已清除、改过的行仍保留。注册与邮件找回密码、成交后丢失响应、两账户争购最后一本也在此环境验证。[真实浏览器用例](../../test/live-java/checkout.spec.ts)

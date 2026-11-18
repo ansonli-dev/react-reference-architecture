@@ -1,63 +1,70 @@
 # 前端架构概览
 
-应用以 Next.js App Router 为外壳，按业务功能划分模块。以书籍目录为例，路由负责组织页面和入口，目录模块持有查询模型和交互组件，服务端读取器统一处理数据读取与公开读缓存。筛选表单、查询规则和目录展示归在同一个 feature，便于一处查阅同一功能的代码。
+书店按业务组织代码，再按执行环境分配职责。前者决定目录和结算可以各自修改哪些代码，后者决定哪些工作适合在请求到来时完成、哪些工作需要响应浏览器事件。两种划分会出现在同一个功能里。目录模块既有服务端页面可用的书卡，也有需要处理用户输入的筛选表单。[架构总图](../../README.md#架构总图)
 
-本地 demo 的加购、购物车更新和结算走 BFF 的资源接口。请求用 HttpOnly Cookie 识别浏览器，同源校验通过后才写 SQLite。详情页加购用条目的 `ETag` 做有条件的 `PUT`，避免同一购物车的并发写入覆盖数量。结算从购物车生成有期限的报价，再以报价和幂等键提交。提交记录、库存扣减、订单快照与购物车清理在同一事务写入，随后公开目录缓存重新读取库存。购物车、报价、提交和订单记录按浏览器读取，响应采用 `Cache-Control: no-store`。[本地购书接口](architecture-spec.md#本地购书接口)
+## 业务模块与页面组合
 
-发布模式接入 Java v1，用 Keycloak 建立账户会话。公开目录从 Java Catalog 读取，私有订单按客户 JWT 访问 Java Order。BFF PostgreSQL 保存购物车草稿和报价与草稿行版本的关联。提交进入 `PLACED` 后，BFF 仅删除版本仍与报价一致的行。失败和处理中状态保留草稿。[Java 集成 ADR](../adr/0004-java-integrated-checkout.md)
+修改目录筛选时，查询规则、生成链接的函数和筛选表单通常一起变化，因此放在 `features/catalog`。报价模型、购物车视图和结算交互归 `features/checkout`。路由知道当前页面需要哪些功能，通过各自的公开入口组装它们。[目录模块](../../src/features/catalog/) · [结算模块](../../src/features/checkout/)
 
-## 页面首屏与独立 HTTP 调用
+购物车的每一行都要显示书封。购物车页把 `renderBookThumbnail` 作为 `renderCover` 属性传给结算视图。图中实线指向导入的代码，虚线表示渲染时通过属性调用函数。
 
 ```mermaid
-flowchart LR
-    Browser["浏览器"]
-    Caller["HTTP 调用方"]
-    subgraph Next["Next.js 应用"]
-        Page["页面 / RSC"] --> Reader["服务端目录读取器"]
-        Route["Route Handler / BFF"] --> Reader
-    end
-    Browser -->|页面导航| Page
-    Caller -->|同源 JSON 请求| Route
+flowchart TB
+    accTitle: 购物车页如何组合结算视图与目录书封
+    accDescr: 购物车页导入结算视图和页面层的缩略图函数。结算视图通过页面传入的函数绘制书封，缩略图函数从目录模块导入书封组件。
+    Page["页面层 · 购物车页"]
+    Cart["结算模块 · CurrencyCart"]
+    Thumb["页面层 · renderBookThumbnail"]
+    Cover["目录模块 · BookCover"]
+    Page --> Cart
+    Page --> Thumb
+    Cart -.->|调用 renderCover| Thumb
+    Thumb --> Cover
 ```
 
-目录页在 `Suspense` 内直接调用服务端读取器，慢请求期间可先发送标题和加载提示。独立 HTTP 调用方通过同源 Route Handler 获取 JSON，路由负责校验输入、选择语言和返回状态码。两个入口共用读取器。生产用例核对筛选后的页面与 JSON 书目一致，并在 Release 目录替身延迟时观察到页面外壳先到。[目录页](<../../src/app/%5Blocale%5D/(store)/books/page.tsx>) · [目录接口](../../src/app/api/v1/catalog/books/route.ts) · [书目一致用例](../../test/e2e/catalog-journey.spec.ts#L53) · [流式用例](../../test/e2e/catalog-journey.spec.ts#L279)
+改书封样式时，改动集中在目录模块。调整数量与金额时，改动集中在结算模块。两个模块的组合关系由购物车页维护。[购物车页](<../../src/app/%5Blocale%5D/(store)/cart/page.tsx>) · [书封组合](<../../src/app/%5Blocale%5D/(store)/book-thumbnail.tsx>) · [依赖规则](architecture-spec.md#公开入口与依赖方向)
 
-只有页面消费数据时，RSC 在进程内读取即可。有独立 HTTP 调用方或浏览器需要脱离页面导航刷新数据时，Route Handler 提供独立的接口契约。目录读取器把后端选择与页面和 HTTP 入口隔开。[双数据源与公开缓存](../adr/0002-public-reads-and-cache.md)
+## 服务端渲染与客户端交互
 
-## 模块与执行环境
+打开目录时，标题和书目对数据的依赖不同。`BooksPage` 先给出标题和加载提示，把等待书目的 `CatalogContent` 放在 `Suspense` 中。结果就绪后，服务端再发出书卡。即使目录读取较慢，读者也能先看到页面外壳。[目录页](<../../src/app/%5Blocale%5D/(store)/books/page.tsx>) · [流式响应用例](../../test/e2e/catalog-journey.spec.ts#L279)
 
-| 模块       | 职责                                                      |
-| ---------- | --------------------------------------------------------- |
-| `app`      | 路由、布局、页面组合、加载与错误边界以及同源 HTTP 入口。  |
-| `features` | 按业务功能收纳界面、可独立执行的校验逻辑和公开入口。      |
-| `server`   | 服务端读取、缓存、运行配置和模块装配。                    |
-| `shared`   | 可复用的基础组件、样式工具和传输类型。                    |
-| `i18n`     | 语言路由与请求语言，翻译资源由根目录的 `messages/` 提供。 |
+筛选需要响应浏览器里的表单提交。页面把选项、当前查询和本地化文案作为属性传给 `CatalogFilters`。该组件用 `'use client'` 声明交互边界，从表单生成新 URL 并触发导航。下一页仍由服务端读取书目。这让事件处理靠近表单，数据源和服务凭据留在服务端。[筛选表单](../../src/features/catalog/ui/catalog-filters.tsx) · [目录读取器](../../src/server/catalog.server.ts)
 
-模块职责与组件运行环境各自独立。`features/catalog` 里既有校验查询参数的纯模型，也有带 `'use client'` 的筛选表单。页面通过公开入口组合这些能力。数据读取和服务端配置留在由 `server-only` 标记的依赖链上。购物车页通过公开入口组合目录书封与结算操作，两个 feature 各自维护业务逻辑。[购物车页](<../../src/app/%5Blocale%5D/(store)/cart/page.tsx>) · [跨 feature 组合 ADR](../adr/0003-frontend-module-composition.md) · [依赖规则](architecture-spec.md#公开入口与依赖方向)
+同一个 feature 可以同时提供纯模型、客户端可用的组件和服务端视图。`client.ts` 是允许浏览器依赖的公开入口，具体文件的 `'use client'` 决定客户端组件边界。`server-only` 保护服务端依赖链。[模块组合决策](../adr/0003-frontend-module-composition.md)
 
-## 渲染与状态归属
+## 状态归属与恢复
 
-目录筛选需要支持分享和后退，报价确认需要在刷新后恢复，同时保护当前会话的交易数据。目录的已提交筛选与页码由 URL 恢复，输入留在表单直到提交。确认页从报价 ID 恢复服务端的报价。现有用例覆盖筛选导航和报价资源的会话隔离。[筛选导航用例](../../test/e2e/catalog-journey.spec.ts#L69) · [交易资源隔离用例](../../test/e2e/bookstore-checkout-http.spec.ts)
+判断状态放在哪里，可以先问：谁需要恢复它？读者把目录链接发给别人，对方应看到同一组筛选。读者把报价链接发给别人，对方却不能读取这笔交易。目录地址保存了重建查询所需的条件，报价地址只保存标识，服务端仍按当前会话查找报价。[目录导航如何保留上下文](catalog-navigation.md) · [报价刷新用例](../../test/e2e/bookstore-checkout.spec.ts#L210) · [交易资源隔离用例](../../test/e2e/bookstore-checkout-http.spec.ts#L129)
 
-| 数据或状态             | 所有者                                                                                          | 代码入口                                                                                                                        |
-| ---------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| 页面语言               | URL 路径中的 `[locale]`。布局据此选择词典并设置文档语言。                                       | [语言路由](../../src/i18n/routing.ts) · [布局](../../src/app/%5Blocale%5D/layout.tsx)                                           |
-| 已提交的筛选条件和页码 | URL 查询字符串。直接访问、刷新和后退都以 URL 为准。                                             | [目录链接](../../src/features/catalog/ui/links.ts)                                                                              |
-| 尚未提交的筛选输入     | 表单自身。应用筛选时改写 URL 并回到第一页。                                                     | [筛选表单](../../src/features/catalog/ui/catalog-filters.tsx)                                                                   |
-| 目录结果与详情         | 服务端读取器。页面与 BFF 共用读取逻辑，演示模式可缓存常用结果。                                 | [公开读取与缓存 ADR](../adr/0002-public-reads-and-cache.md)                                                                     |
-| 购物车                 | Demo 按浏览器会话保存在 SQLite，Release 按账户保存在 BFF PostgreSQL。                           | [购物车页](<../../src/app/%5Blocale%5D/(store)/cart/page.tsx>)                                                                  |
-| 报价与订单提交         | 报价 URL 只持有 ID。服务端按当前会话读取，Demo 由 SQLite 持有交易，Release 由 Java Order 持有。 | [报价接口](../../src/app/api/v1/order-quotes/%5BquoteId%5D/route.ts) · [Java 结算 ADR](../adr/0004-java-integrated-checkout.md) |
-| 主题选择               | 浏览器 `localStorage`。通过文档根节点的 `data-theme` 切换语义色。                               | [主题开关](../../src/shared/ui/theme-switch.tsx) · [全局样式](../../src/app/globals.css)                                        |
+| 数据或状态             | 所有者                                                              | 代码入口                                                                                                                                              |
+| ---------------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 页面语言               | URL 路径中的 `[locale]`。布局据此选择词典并设置文档语言。           | [语言路由](../../src/i18n/routing.ts) · [布局](../../src/app/%5Blocale%5D/layout.tsx)                                                                 |
+| 已提交的筛选条件和页码 | URL 查询字符串。直接访问、刷新和后退都以 URL 为准。                 | [目录链接](../../src/features/catalog/ui/links.ts)                                                                                                    |
+| 尚未提交的筛选输入     | 表单自身。应用筛选时改写 URL 并回到第一页。                         | [筛选表单](../../src/features/catalog/ui/catalog-filters.tsx)                                                                                         |
+| 目录结果与详情         | 目录数据源。页面与 BFF 通过同一读取器取数，演示模式可缓存公开结果。 | [公开读取与缓存 ADR](../adr/0002-public-reads-and-cache.md)                                                                                           |
+| 购物车                 | 服务端。演示按浏览器会话隔离，发布按登录账户隔离。                  | [购物车页](<../../src/app/%5Blocale%5D/(store)/cart/page.tsx>)                                                                                        |
+| 报价与订单提交         | 服务端。确认页用报价 ID 恢复报价，提交结果可通过同源状态接口读取。  | [报价接口](../../src/app/api/v1/order-quotes/%5BquoteId%5D/route.ts) · [状态接口](../../src/app/api/v1/order-submissions/%5BsubmissionId%5D/route.ts) |
+| 主题选择               | 浏览器 `localStorage`。通过文档根节点的 `data-theme` 切换语义色。   | [主题开关](../../src/shared/ui/theme-switch.tsx) · [全局样式](../../src/app/globals.css)                                                              |
 
 只有多个客户端视图需要共享远端数据并协调刷新时，才评估客户端查询缓存。需要跨区域编辑同一份未提交草稿时，可使用本地共享状态。
 
+## 页面首屏与独立 HTTP 调用
+
+目录页已经在服务端执行，可以直接调用 `readCatalog`。需要独立 JSON 响应的调用方走同源 Route Handler，由它处理 HTTP 参数、语言和状态码。两个入口共用查询模型和读取器，一处调整书目选择规则即可作用于两条路径。[目录页](<../../src/app/%5Blocale%5D/(store)/books/page.tsx>) · [目录接口](../../src/app/api/v1/catalog/books/route.ts) · [页面与 JSON 书目一致用例](../../test/e2e/catalog-journey.spec.ts#L53)
+
+数据源的选择也在读取器内完成。演示模式下，常用的公开列表和详情可以复用服务端缓存，自由文本查询直接读取。发布模式每次读当前目录，以反映最新库存。两种模式提供同一套页面和 HTTP 契约。HTTP 响应的 `no-store` 与读取器内部的缓存分别作用于不同边界。[目录端口](../../src/features/catalog/server.ts) · [服务端装配](../../src/server/catalog.server.ts) · [公开读取与缓存决策](../adr/0002-public-reads-and-cache.md)
+
 ## 并发写入与异步结算
 
-不同标签页可能同时写购物车，订单写入后浏览器也可能收不到提交响应。条目的 `ETag` 表示当前版本，`If-Match` 带回该版本。收到 `412` 时，页面提示核对最新数量。报价固定此次交易输入，提交使用报价 ID 作为稳定的幂等键，响应的 `Location` 指向可独立查询的提交资源。[条目接口](../../src/app/api/v1/cart/items/%5BbookId%5D/route.ts) · [提交接口](../../src/app/api/v1/order-submissions/route.ts) · [跨标签页冲突用例](../../test/e2e/bookstore-checkout.spec.ts#L62) · [幂等重放用例](../../test/e2e/bookstore-checkout-http.spec.ts)
+在两个标签页里打开购物车，后提交的页面可能还显示旧数量。更新或删除时，浏览器用 `If-Match` 交回读到的条目版本，旧版本会得到 `412`。报价保护的范围更大：创建报价时，服务端检查所选币种下整组条目的版本。发布模式还记下参与报价的每一行，成交时只清除版本依旧匹配的条目。[跨标签页冲突用例](../../test/e2e/bookstore-checkout.spec.ts#L62) · [报价后又改了购物车会怎样](../adr/0004-java-integrated-checkout.md)
 
-Release 的 `202` 表示提交已受理，结果仍待确认。只有 `PROCESSING` 触发有限轮询，`RECONCILE_REQUIRED` 提示等待核对并可手动重查。成功以 `PLACED` 且有订单 ID 为准。Demo 的浏览器用例用模拟的 `202` 验证轮询，实际订单由 SQLite 同步提交。[结算交互](../../src/features/checkout/ui/checkout-form.tsx) · [Demo 模拟轮询用例](../../test/e2e/bookstore-checkout.spec.ts#L215) · [真实 Java 支撑的 BFF 用例](../../test/live-java/checkout.spec.ts#L437)
+订单已写入而响应丢失时，版本检查不能回答「这笔订单成立了吗」。书店以报价 ID 为幂等键，重试同一报价可以取回提交结果。若提交仍在处理，浏览器可查询独立的状态资源，等到收到订单 ID 再进入订单页。本站表单的一次性写入可用 Server Action。这里的条件请求、幂等重放与状态查询共同构成了需要独立维护的 HTTP 接口。[浏览器怎样确认一次下单的结果](checkout-contract.md) · [BFF 契约](../../contracts/bff/v1.yaml)
 
-提交或轮询失去认证时保留报价 ID。Release 让用户重新登录并回到原报价，再用同一幂等键手动继续确认。已经受理的提交可以在报价到期后重放。联调用例只模拟触发恢复的操作 401，随后走真实 Keycloak 回跳和 Java 下单。[登录恢复用例](../../test/live-java/checkout.spec.ts#L437) · [报价到期后重放用例](../../test/integration/demo-checkout.test.ts#L118)
+## 从筛选书目到确认订单
 
-仅由本站表单发起且无需独立 HTTP 契约的单次写入可用 Server Action。书店用同源 BFF 表达版本冲突、幂等重放和提交状态查询。[BFF 契约](../../contracts/bff/v1.yaml)
+| 读者操作   | 浏览器带给下一步的数据                                           | 页面或交易如何恢复                                                                                                                                           |
+| ---------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 应用筛选   | 将分类、关键词写入目录 URL，回到第一页。                         | 后退或直接打开链接时，页面按地址中的查询重新展示书目。[筛选导航用例](../../test/e2e/catalog-journey.spec.ts#L69)                                             |
+| 加入购物车 | 按书籍 ID 写入数量，成功后导航到购物车。                         | 购物车页按当前会话读取草稿，刷新后仍能看到保存的条目。[购物车页](<../../src/app/%5Blocale%5D/(store)/cart/page.tsx>)                                         |
+| 创建报价   | 提交所选币种和该组购物车的版本，将返回的报价 ID 放入确认页 URL。 | 刷新确认页时，服务端按会话和报价 ID 读回同一份报价。[交易请求](../../src/features/checkout/api.ts)                                                           |
+| 确认下单   | 提交报价 ID，同时用它作为幂等键。                                | 响应丢失后用同一键再次确认，可取回已成立的订单。演示用例核对只生成一笔订单、只扣一次库存。[丢响应后重试用例](../../test/e2e/bookstore-checkout.spec.ts#L387) |

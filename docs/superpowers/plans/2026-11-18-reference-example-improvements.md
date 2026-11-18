@@ -1,5 +1,7 @@
 # React 架构参考示例改进计划
 
+此处保留实施前的任务清单。对应改动已在 [PR #10](https://github.com/ansonli-dev/react-reference-architecture/pull/10) 合入，当前的章节组织见[架构导读](../../../README.md#架构导读)。
+
 让读者能按架构问题找到「页间书店」中的实现，从适用条件判断何时采用同样的方案。每个案例简明说明问题、实现、方案取舍和验证证据。功能验收聚焦目录与结算已有链路。评审基线为 `f2e581d`。[改进规格](../specs/2026-11-18-reference-example-improvements-design.md) · [评审依据](../../architecture/reference-example-review.md)
 
 采用现有 Next.js App Router、OpenAPI、Zod、Vitest 和 Playwright。路由在应用层组合 feature，服务端秘密和会话处在 `server-only` 依赖链。以 Superpowers 分任务验证规格和代码质量，最终分支还有独立评审。

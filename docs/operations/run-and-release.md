@@ -1,62 +1,121 @@
 # 运行与发布手册
 
-演示构建使用本地 SQLite。发布构建接入 Java v1 Catalog、Java v1 Order、Keycloak 和 BFF PostgreSQL。使用 Node 24、pnpm 11.25.0 和锁文件，验证环境固定用 Node 24.15.0。
+本地体验书店用演示模式。验证账户登录、真实库存或异步订单用发布模式。两者共用页面与同源接口，各自构建、各自启动。使用 Node.js 24 和 pnpm 11.25.0。
 
-|                | 演示 `demo`                          | 发布 `release`                      |
-| -------------- | ------------------------------------ | ----------------------------------- |
-| 数据           | 独立 SQLite 种子                     | Java v1、Keycloak 和 BFF PostgreSQL |
-| 目录能力       | 分类、关键词、分页、详情             | 分类、关键词、分页、详情            |
-| 购书能力       | 购物车、演示下单、本浏览器的订单记录 | 账户购物车、报价、下单和订单记录    |
-| 开发           | `pnpm dev:mock`                      | `pnpm dev:real`                     |
-| 生产构建、启动 | `pnpm build:demo`、`pnpm start:demo` | `pnpm build`、`pnpm start`          |
-| 产物           | `.next-demo/`                        | `.next/`                            |
+| 运行方式 | 数据和身份                   | 开发            | 生产构建与启动                        |
+| -------- | ---------------------------- | --------------- | ------------------------------------- |
+| 演示     | 本地 SQLite、浏览器会话      | `pnpm dev:mock` | `pnpm build:demo` → `pnpm start:demo` |
+| 发布     | 外部目录与订单服务、登录账户 | `pnpm dev:real` | `pnpm build` → `pnpm start`           |
 
-两个模式的 `/en` 与 `/zh-CN` 都重定向到对应语言的书籍目录。目录在运行时读取数据，构建可独立执行。启动后，`GET /api/health` 返回进程存活状态。`GET /api/ready` 检查运行配置能否解析并实际读一次目录。数据源缺失、不可读或配置不合法时，就绪返回 503 与有限的原因码；进程健康仍可返回 200。已知语言的未匹配路径返回本地化 HTTP 404。书籍详情流式缺失时响应头可能已是 200，同一书号的 BFF 响应仍是 404。
+演示产物在 `.next-demo/`，发布产物在 `.next/`。启动命令会核对产物记录的模式。遇到 `Expected a … build` 时，在同一工作目录运行该模式的构建命令。连接地址和凭据由进程在运行时读取。[启动脚本](../../scripts/run-app.mjs) · [产物检查](../../scripts/build-profiles.mjs)
+
+## 本地演示
+
+在前端仓库根目录安装依赖、初始化书目并启动前端。
+
+```bash
+pnpm install --frozen-lockfile
+export DEMO_DATA_DIR="$PWD/.bookstore-demo"
+pnpm demo:seed
+pnpm dev:mock
+```
+
+打开[中文目录](http://127.0.0.1:3000/zh-CN/books)或[英文目录](http://127.0.0.1:3000/en/books)。购物车和订单按浏览器 Cookie 隔离，按币种结算，下单和扣库存由同一 SQLite 事务完成。
+
+再次运行时沿用原来的 `DEMO_DATA_DIR`。种子命令会执行缺少的迁移，并按书籍 ID 补齐种子书目。需要恢复初始库存时，选择一个新的空数据目录再运行种子命令。[种子脚本](../../scripts/demo-seed.mjs)
 
 ## 配置
 
-| 环境变量        | 用途                                                                                                               |
-| --------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `PORT`          | 服务端口，默认 3000。演示模式和开发命令监听回环；发布 `start` 默认监听 `0.0.0.0`，可用 `BOOKSTORE_HOST` 指定地址。 |
-| `APP_ORIGIN`    | 前端完整 origin，默认 `http://127.0.0.1:3000`。改变访问端口或外部域名时一起设置；演示模式只接受本机 origin。       |
-| `DEMO_DATA_DIR` | 演示模式 SQLite 数据目录的绝对路径。种子命令和前端进程都需收到这个变量。                                           |
+| 变量             | 何时设置                                                                                                 |
+| ---------------- | -------------------------------------------------------------------------------------------------------- |
+| `DEMO_DATA_DIR`  | 演示数据目录使用绝对路径。种子命令与前端进程使用同一目录。                                               |
+| `PORT`           | 默认 3000。更换端口时同步调整浏览器地址和 `APP_ORIGIN`。                                                 |
+| `APP_ORIGIN`     | 浏览器实际访问的 origin，默认 `http://127.0.0.1:3000`。用于同源写入校验和登录回调。                      |
+| `BOOKSTORE_HOST` | 发布模式的 `pnpm start` 默认监听 `0.0.0.0`，可用此变量指定监听地址。开发服务和演示服务绑定 `127.0.0.1`。 |
 
-发布模式的目录服务地址与服务端凭据从运行环境读取，配置项见 [环境变量模板](../../.env.example)。
-
-按照 README 安装依赖、导出数据目录、写入种子并启动开发服务。访问 `/zh-CN/books`，或从另一终端用 `curl -fsS http://127.0.0.1:3000/api/v1/catalog/books` 核对目录结果。[本地启动](../../README.md#本地启动)
-
-旧版 demo 数据用同一个 `DEMO_DATA_DIR` 重跑 `pnpm demo:seed`，即可应用最新的表结构迁移。种子只补缺失的书籍，已有书目、库存及订单会保留。购物车和订单以浏览器的 `bookstore-shopper` Cookie 区分，使用同一个浏览器和访问域名即可继续试用。结算按币种生成订单，库存和订单在同一 SQLite 事务写入。URL 端口与 `APP_ORIGIN` 要一致，例如 `PORT=3001 APP_ORIGIN=http://127.0.0.1:3001 pnpm dev:mock`。
-
-书籍目录按 1–100 页分页，每页最多 12 本。发布模式从 Java Catalog 读取分类和一页书籍，并使用上游返回的分页状态。[公开读取与缓存 ADR](../adr/0002-public-reads-and-cache.md)
-
-故障日志中 `event=catalog.read_failed` 记录固定的目录入口、请求 ID、分类状态与耗时。用 BFF 响应里的 `error.requestId` 搜索同一个 ID；页面降级事件按入口和时间定位。页面日志的 `status` 是分类状态，流式 HTML 可能已经发出 200。运行时凭据不进入这些记录。
-
-报价与提交资源的 5xx 会记录 `event=checkout.request_failed`。用 BFF 响应的 `error.requestId` 关联操作名、错误码、HTTP 状态和耗时。[结算关联测试](../../test/unit/checkout-observability.test.ts)
+例如用 `PORT=3001 APP_ORIGIN=http://127.0.0.1:3001 pnpm dev:mock` 启动后，浏览器也应访问 `http://127.0.0.1:3001`。端口、主机或协议不一致，都可能让页面可以打开、购物车写入却返回 `403`。[运行配置](../../src/server/config/runtime.server.ts) · [同源校验](../../src/server/http/origin.server.ts)
 
 ## Java 集成
 
-本地联调可用 Java 仓库的 `demo/compose.yaml` 和 `demo/compose.frontend.yaml` 启动完整环境。后端 `demo/README.md` 记录启动步骤。[Java 仓库](https://github.com/ansonli-dev/explicit-architecture) · [Java OpenAPI 契约](../../contracts/java/README.md) · [真实 Java 与 Keycloak 验证](../testing-strategy/README.md#真实-java-与-keycloak-联调)
+**使用现成的联调环境。** 后端仓库的 Compose 和前端 overlay 一起启动目录、订单、登录服务、前端与数据库，并为新建的前端数据库初始化表结构。默认从同级的前端仓库构建，可通过 `BOOKSTORE_FRONTEND_DIR` 指向其他检出目录。按联调手册构建后端并启动环境，从 `http://localhost:3000` 访问前端，域名要与已注册的登录回调一致。[后端联调手册](https://github.com/ansonli-dev/explicit-architecture/blob/main/demo/README.md#frontend-handoff) · [接口契约](../../contracts/java/README.md)
 
-在独立的 BFF PostgreSQL 数据库执行 [会话建表](../../database/auth.sql) 和 [购物车建表](../../database/cart.sql)。配置 Java Catalog 和 Order 服务的地址以及 Keycloak 客户端，再用同一个发布构建执行 `pnpm start`。访问 `/zh-CN/books` 或 `/en/books`，点击注册或登录。验证邮箱并登录后，可从详情加购，核对人民币报价，提交订单并重新打开订单列表。
+**接入已有服务。** 在 BFF 专用 PostgreSQL 数据库执行会话和购物车建表脚本，将下列变量提供给前端运行进程。开发时执行 `pnpm dev:real`，运行已构建的发布产物时执行 `pnpm start`。[会话表](../../database/auth.sql) · [账户购物车表](../../database/cart.sql) · [环境变量模板](../../.env.example)
 
-| 环境变量                 | 用途                                                                |
-| ------------------------ | ------------------------------------------------------------------- |
-| `JAVA_CATALOG_BASE_URL`  | BFF 可访问的 Java Catalog origin。                                  |
-| `JAVA_ORDER_BASE_URL`    | BFF 可访问的 Java Order origin。                                    |
-| `AUTH_DATABASE_URL`      | BFF PostgreSQL 连接，保存会话和以认证主体为键的购物车草稿。         |
-| `APP_ORIGIN`             | 浏览器访问的前端 origin，用于同源校验与回调地址。                   |
-| `OIDC_ISSUER`            | 浏览器及 JWT 使用的 Keycloak realm URL。                            |
-| `OIDC_INTERNAL_BASE_URL` | 可选的容器内 Keycloak realm URL，用于发现、令牌交换和签名密钥读取。 |
-| `OIDC_CLIENT_ID`         | BFF 的 Keycloak 客户端，默认 `bookstore-bff`。                      |
-| `OIDC_CLIENT_SECRET`     | BFF 客户端凭据。                                                    |
+| 变量                                           | 运行时用途                                                                              |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------- |
+| `JAVA_CATALOG_BASE_URL`、`JAVA_ORDER_BASE_URL` | BFF 可访问的两个服务 origin，适配器自行拼接 API 路径。                                  |
+| `AUTH_DATABASE_URL`                            | BFF 的 PostgreSQL 连接。会话令牌、账户购物车和报价行版本关联保存在此处。                |
+| `APP_ORIGIN`                                   | 浏览器访问前端的 origin。回调注册为 `${APP_ORIGIN}/api/auth/oauth2/callback/keycloak`。 |
+| `OIDC_ISSUER`                                  | 浏览器可达的公开 realm URL，也是令牌的签发者。                                          |
+| `OIDC_INTERNAL_BASE_URL`                       | 可选。BFF 在独立网络内访问同一个 realm 的地址，默认取公开 issuer。                      |
+| `OIDC_CLIENT_ID`、`OIDC_CLIENT_SECRET`         | BFF 的客户端 ID 和服务端密钥，默认 ID 为 `bookstore-bff`。                              |
 
-Keycloak 客户端需注册 `APP_ORIGIN/api/auth/oauth2/callback/keycloak`，并向 Order 服务发放所需受众及已验证邮箱声明。前端 origin 和公开 issuer 在回环联调外使用 HTTPS。会话 Cookie 随浏览器请求发送给 BFF。Java 访问令牌留在服务端，BFF 仅在调用用户自己的 Order 接口时添加 Bearer 凭据。发布模式下未登录的私有 BFF 请求返回 401，私有资源使用 `Cache-Control: no-store`。
+回环联调可使用 HTTP。对外部署用 HTTPS 提供前端、公开 issuer 和内部 realm 地址。通过部署环境注入数据库连接与客户端密钥。浏览器持有会话 Cookie，BFF 在服务端换取令牌并携带用户凭据访问订单接口。[会话实现](../../src/server/auth.server.ts)
 
-在 Keycloak realm 开启 User registration、Verify email 和 Forgot password，将 `bookstore-reader` 加入默认角色，并配置可投递验证和重置邮件的 SMTP。Java 仓库的 Compose 会挂载 `bookstore` 登录主题。部署到独立 Keycloak 时，安装同一主题，并将 BFF 客户端的 Home URL 设为书店根地址。Compose 联调环境的邮件可在 [本地收件箱](http://localhost:8025) 查看。
+自建 realm 时配置已验证邮箱、读者角色和订单服务所需的令牌受众。启用注册、邮箱验证及密码重置后，配置 SMTP，安装书店登录主题，并把客户端 Home URL 设为书店根地址。Compose 使用 Mailpit 接收测试邮件。用隔离种子运行真实浏览器用例可以同时检查邮箱流程、账户草稿和异步订单。[本地收件箱](http://localhost:8025) · [真实联调用例](../testing-strategy/README.md#真实-java-与-keycloak-联调)
+
+## 运行诊断
+
+`GET /api/health` 检查前端进程能否响应。`GET /api/ready` 进一步解析运行配置，并通过当前适配器读取第一页目录。就绪失败时，响应 JSON 的 `reason` 给出下表的原因码。账户登录、会话数据库和订单提交由独立联调验证。[就绪路由](../../src/app/api/ready/route.ts) · [目录探测](../../src/server/catalog.server.ts) · [真实联调](../testing-strategy/README.md#真实-java-与-keycloak-联调)
+
+| 现象                                     | 定位依据                                                                                                                                                               |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/ready` 返回 `503 CONFIG_INVALID`   | 核对当前模式要求的环境变量、origin 和 issuer 的格式，以及回环或 HTTPS 条件。                                                                                           |
+| `503 CATALOG_NOT_CONFIGURED`             | 演示进程没有收到 `DEMO_DATA_DIR`。导出种子使用的绝对路径并重启。                                                                                                       |
+| `503 CATALOG_UNAVAILABLE`                | 演示模式检查种子、数据库读权限和表结构版本。发布模式从 BFF 所在网络检查目录服务及其响应。                                                                              |
+| 读取目录、创建或读取报价与提交时返回 5xx | 用响应中的 `error.requestId` 查服务端日志。目录事件为 `catalog.read_failed`，报价和提交事件为 `checkout.request_failed`。日志记录入口或操作、错误码、HTTP 状态和耗时。 |
+
+已经开始流式返回的 HTML 可能保留 HTTP 200。定位页面故障时看界面反馈和对应入口日志。核对书籍是否存在时可直接查看详情 BFF 的 HTTP 状态。[目录日志](../../src/server/observability/catalog.server.ts) · [结算日志用例](../../test/unit/checkout-observability.test.ts)
+
+## 构建并运行发布镜像
+
+在要发布的干净检出中，先运行独立的镜像烟测。烟测使用目录替身验证双语目录、静态资源、探针和匿名购物车边界，并清理本次测试镜像。随后构建用于部署的镜像，以 Git SHA 标记版本并记录 OCI revision。[镜像烟测](../../scripts/test-release.sh) · [Dockerfile](../../Dockerfile)
+
+```bash
+bash scripts/test-release.sh
+release_sha=$(git rev-parse HEAD)
+docker build --label "org.opencontainers.image.revision=$release_sha" -t "bookstore:$release_sha" .
+docker image inspect --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}' "bookstore:$release_sha"
+```
+
+将 `release_env_file` 设为发布环境文件的路径，`catalog_network` 设为能访问所配服务的 Docker 网络。下例把非 root 的前端进程发布到本机 3000 端口。就绪返回 200 后再接入流量。
+
+```bash
+docker run -d --name bookstore-current --network "$catalog_network" \
+  --env-file "$release_env_file" -p 127.0.0.1:3000:3000 "bookstore:$release_sha"
+curl --retry 15 --retry-delay 1 --retry-connrefused -fsS http://127.0.0.1:3000/api/ready
+curl -fsS http://127.0.0.1:3000/api/health
+curl -fsS http://127.0.0.1:3000/api/v1/catalog/books
+```
+
+## 切回上一版本
+
+保留本次和上一版本的镜像及其 SHA、镜像 ID。将 `previous_sha` 设为上一版本的 Git SHA，先在备用端口用当前配置验证它。
+
+```bash
+docker run -d --name bookstore-restore-check --network "$catalog_network" \
+  --env-file "$release_env_file" -p 127.0.0.1:3001:3000 "bookstore:$previous_sha"
+curl --retry 15 --retry-delay 1 --retry-connrefused -fsS http://127.0.0.1:3001/api/ready
+curl -fsS http://127.0.0.1:3001/api/v1/catalog/books
+```
+
+使用反向代理时，可将流量切到已经验证的上一版本实例。直接绑定回环端口的部署，确认备用端口就绪后再切换原端口。
+
+```bash
+docker stop bookstore-current
+docker run -d --name bookstore-restored --network "$catalog_network" \
+  --env-file "$release_env_file" -p 127.0.0.1:3000:3000 "bookstore:$previous_sha"
+curl --retry 15 --retry-delay 1 --retry-connrefused -fsS http://127.0.0.1:3000/api/ready
+curl -fsS http://127.0.0.1:3000/api/v1/catalog/books
+test "$(docker inspect --format '{{.Image}}' bookstore-restored)" = \
+  "$(docker image inspect --format '{{.Id}}' "bookstore:$previous_sha")"
+```
+
+验证通过后可用 `docker rm -f bookstore-restore-check` 清理备用实例。若原端口恢复失败，停止 `bookstore-restored` 后可用 `docker start bookstore-current` 重新启动切换前的实例。
 
 ## 固定 Linux 验证环境
 
-宿主限制 Turbopack 子进程绑定端口时，用下列命令从已提交前端源码运行双档生产 Chromium。镜像与视觉入口使用相同的固定 Linux ARM64 Playwright 环境。
+宿主限制 Turbopack 子进程绑定端口时，用下列命令基于已提交的前端源码验证演示和发布产物的 Chromium 端到端用例。镜像与视觉入口使用相同的固定 Linux ARM64 Playwright 环境。
 
 ```bash
 frontend_sha=$(git rev-parse HEAD)
@@ -73,57 +132,4 @@ git archive "$frontend_sha" | docker run --rm -i --init --ipc=host --platform li
   '
 ```
 
-从包含 Git 元数据的工作区运行 `bash scripts/test-visual.sh` 可复验截图基线。
-
-更新 Node 或 pnpm 后，同步 `.nvmrc`、`package.json`、锁文件、固定验证环境和镜像基础层。重新跑冻结安装、peer、类型、Lint、格式、架构与生成检查、Vitest、双档生产构建、Chromium、视觉、参考镜像烟测和两版本回滚。[分层测试命令](../testing-strategy/README.md#运行入口)
-
-## 构建并运行发布镜像
-
-从要发布的干净 Git 检出构建。镜像以 Git SHA 命名，同时写入 OCI revision。运行镜像以非 root 用户从 3000 端口执行 `pnpm start`，不需要在启动时安装任何依赖。
-
-```bash
-bash scripts/test-release.sh
-release_sha=$(git rev-parse HEAD)
-docker build --label "org.opencontainers.image.revision=$release_sha" -t "bookstore:$release_sha" .
-docker image inspect --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}' "bookstore:$release_sha"
-```
-
-普通 CI 的 Release 端到端测试使用目录替身，覆盖发布构建的目录和匿名访问边界。镜像烟测在内部 Docker 网络使用隔离的目录替身，核对镜像的健康、就绪、双语目录、静态资源与同源 BFF。账户、邮件、PostgreSQL 草稿与 Java Order 由独立联调验证。[普通 CI](../../.github/workflows/ci.yml) · [镜像烟测](../../scripts/test-release.sh) · [真实 Java 与 Keycloak 联调](../testing-strategy/README.md#真实-java-与-keycloak-联调)
-
-下例从回环访问发布镜像，`$release_env_file` 提供运行配置，`$catalog_network` 是部署网络。
-
-```bash
-docker run -d --name bookstore-current --network "$catalog_network" \
-  --env-file "$release_env_file" -p 127.0.0.1:3000:3000 "bookstore:$release_sha"
-curl -fsS http://127.0.0.1:3000/api/health
-curl -fsS http://127.0.0.1:3000/api/ready
-curl -fsS http://127.0.0.1:3000/api/v1/catalog/books
-```
-
-等就绪返回 200 再接流量。保留本次和上一版本的镜像引用，记录各自的 SHA 与镜像 ID。
-
-## 切回上一版本
-
-将 `$previous_sha` 设为上一版本已记录的 Git SHA。用相同配置先在另一个端口验证该镜像：
-
-```bash
-docker run -d --name bookstore-restore-check --network "$catalog_network" \
-  --env-file "$release_env_file" -p 127.0.0.1:3001:3000 "bookstore:$previous_sha"
-curl -fsS http://127.0.0.1:3001/api/ready
-curl -fsS http://127.0.0.1:3001/api/v1/catalog/books
-```
-
-在有反向代理的环境，把稳定入口切到已就绪的上一版本；直接绑定回环端口的参考部署可停下当前容器并把原端口绑定回上一版本：
-
-```bash
-docker stop bookstore-current
-docker run -d --name bookstore-restored --network "$catalog_network" \
-  --env-file "$release_env_file" -p 127.0.0.1:3000:3000 "bookstore:$previous_sha"
-curl -fsS http://127.0.0.1:3000/api/ready
-curl -fsS http://127.0.0.1:3000/api/v1/catalog/books
-test "$(docker inspect --format '{{.Image}}' bookstore-restored)" = \
-  "$(docker image inspect --format '{{.Id}}' "bookstore:$previous_sha")"
-docker rm -f bookstore-restore-check
-```
-
-验证相同入口的就绪、目录响应和容器镜像 ID 后记录切回结果。本仓的演练用前一个可构建提交和当前候选在隔离网络复现该流程。正式部署须先有上一版本产物才能切回。
+固定环境使用 Node.js 24.15.0 和 pnpm 11.25.0。升级验证工具时同步检查镜像摘要、浏览器版本与仓库运行基线。截图比较由 `bash scripts/test-visual.sh` 在同版本镜像运行。[测试命令](../testing-strategy/README.md#运行入口) · [视觉验证脚本](../../scripts/test-visual.sh)
