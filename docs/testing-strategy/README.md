@@ -70,6 +70,8 @@ pnpm test:e2e
 bash scripts/test-visual.sh
 ```
 
-端到端测试用仓库自带的目录替身验证故障、超时和日志关联。用 `bash scripts/test-release.sh` 在内部 Docker 网络验证发布镜像的健康、就绪、目录和静态资源。[镜像构建与运行](../operations/run-and-release.md#构建并运行发布镜像)
+普通 CI 的 Release 端到端测试使用目录替身，覆盖发布构建的目录、匿名访问边界、故障、超时与日志关联。`/api/ready` 检查运行配置可解析、目录可读。镜像烟测用 `bash scripts/test-release.sh` 在内部 Docker 网络验证发布镜像的健康、就绪、目录和静态资源。Demo 用例通过 SQLite 验证真实的订单与库存写入，通过替换同步落单的响应为 `202 PROCESSING` 验证浏览器轮询。[Release HTTP 用例](../../test/e2e/catalog-http.spec.ts) · [匿名访问用例](../../test/e2e/build-profiles.spec.ts) · [镜像构建与运行](../operations/run-and-release.md#构建并运行发布镜像) · [Demo 购书用例](../../test/e2e/bookstore-checkout.spec.ts)
 
-连接运行中的 Java 联调环境后执行 `pnpm test:e2e:java`。用例通过 Keycloak 登录，覆盖下单、提交响应丢失后的重试，以及两位账户争购最后一本时的库存和购物车行为。[Java 集成启动](../operations/run-and-release.md#java-集成) · [浏览器用例](../../test/live-java/checkout.spec.ts)
+### 真实 Java 与 Keycloak 联调
+
+连接带隔离种子数据的 Java 联调环境后执行 `pnpm test:e2e:java`。这套用例覆盖 Keycloak 登录、邮件验证及密码重置、账户购物车草稿在 PostgreSQL 中的恢复，以及 Java Order 的下单、丢响应重试和两位账户争购最后一本。[Java 集成启动](../operations/run-and-release.md#java-集成) · [浏览器用例](../../test/live-java/checkout.spec.ts)
