@@ -17,7 +17,7 @@ export function BookCover({
   book,
   size = 'card',
 }: {
-  book: Pick<Book, 'id' | 'title'> & Partial<Pick<Book, 'author'>>;
+  book: Pick<Book, 'id' | 'title'> & Partial<Pick<Book, 'author' | 'coverUrl'>>;
   size?: 'card' | 'detail' | 'thumbnail';
 }) {
   const seed = Number.parseInt(book.id.slice(-6), 16);
@@ -38,6 +38,16 @@ export function BookCover({
               <span className="book-cover-author">{book.author}</span>
             )}
           </>
+        )}
+        {book.coverUrl && (
+          // eslint-disable-next-line @next/next/no-img-element -- The browser loads the catalog's external cover directly.
+          <img
+            src={book.coverUrl}
+            alt=""
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            className="absolute inset-0 size-full object-cover"
+          />
         )}
       </span>
     </span>

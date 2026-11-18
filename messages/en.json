@@ -10,7 +10,9 @@
     "theme": "Toggle dark theme",
     "skip": "Skip to content",
     "notFound": "Page not found",
-    "backToCatalog": "Back to books"
+    "backToCatalog": "Back to books",
+    "signIn": "Sign in",
+    "signOut": "Sign out"
   },
   "Catalog": {
     "title": "Book catalog",
@@ -86,7 +88,20 @@
       "consumed": "This quote was already submitted. Check your orders.",
       "conflict": "This submission conflicts with an existing record. Review a new quote.",
       "processing": "Your order is processing. Submit the same quote to check its status.",
-      "reconcile": "Your order is under review. Submit the same quote to check its status."
+      "reconcile": "Your order is under review. Submit the same quote to check its status.",
+      "signIn": "Sign in to use your cart and orders.",
+      "email": "Verify your account email before requesting a quote.",
+      "intake": "The bookstore is temporarily pausing checkout. Your cart is saved.",
+      "currency": "Checkout currently supports CNY prices."
+    },
+    "placeLiveOrder": "Place order",
+    "pagination": "Order history pagination",
+    "orderStatus": {
+      "PENDING": "Pending",
+      "PLACED": "Placed",
+      "CONFIRMED": "Confirmed",
+      "SHIPPED": "Shipped",
+      "CANCELLED": "Cancelled"
     }
   }
 }

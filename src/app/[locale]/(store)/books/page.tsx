@@ -83,7 +83,8 @@ async function CatalogContent({
     );
   }
 
-  if (query.q && !supportsCatalogSearch) {
+  const search = supportsCatalogSearch();
+  if (query.q && !search) {
     return (
       <CatalogNotice
         message={t('unsupported')}
@@ -118,7 +119,7 @@ async function CatalogContent({
         base={base}
         query={query}
         categories={categories}
-        search={supportsCatalogSearch}
+        search={search}
         labels={{
           category: t('category'),
           allCategories: t('allCategories'),

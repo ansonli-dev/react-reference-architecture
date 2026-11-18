@@ -6,34 +6,41 @@ import type { CatalogPort } from '@/features/catalog/server';
 import type { Locale } from '@/i18n/routing';
 import { ApiFailure } from '@/shared/api/error';
 import { createJavaCatalogV1 } from './adapters/java/catalog-v1.server';
-import { runtimeConfig, type RuntimeConfig } from './config/runtime.server';
+import { createJavaCatalogV2 } from './adapters/java/catalog-v2.server';
+import {
+  integratedEnabled,
+  runtimeConfig,
+  type RuntimeConfig,
+} from './config/runtime.server';
 
 type CatalogSource =
   | { profile: 'demo'; dataDir: string }
   | {
       profile: 'release';
+      contract: 'v1-catalog' | 'v2-integrated';
       baseUrl: string;
       categories: string[];
       token?: string;
     };
 
-export const supportsCatalogSearch =
-  process.env.BOOKSTORE_BUILD_PROFILE === 'demo';
+export function supportsCatalogSearch() {
+  return process.env.BOOKSTORE_BUILD_PROFILE === 'demo' || integratedEnabled();
+}
 
 function sourceFor(config: RuntimeConfig): CatalogSource | null {
-  if (supportsCatalogSearch && config.profile === 'demo' && config.dataDir) {
+  if (config.profile === 'demo' && config.dataDir) {
     return { profile: 'demo', dataDir: config.dataDir };
   }
-  if (
-    config.profile === 'release' &&
-    config.javaContract === 'v1-catalog' &&
-    config.javaCatalogBaseUrl
-  ) {
+  if (config.profile === 'release' && config.javaCatalogBaseUrl) {
     return {
       profile: 'release',
+      contract: config.javaContract,
       baseUrl: config.javaCatalogBaseUrl,
       categories: config.catalogCategories,
-      token: config.javaCatalogToken,
+      token:
+        config.javaContract === 'v1-catalog'
+          ? config.javaCatalogToken
+          : undefined,
     };
   }
   return null;
@@ -50,7 +57,11 @@ function requireSource() {
 }
 
 async function catalogPort(source: CatalogSource): Promise<CatalogPort> {
-  if (source.profile === 'release') return createJavaCatalogV1(source);
+  if (source.profile === 'release') {
+    return source.contract === 'v2-integrated'
+      ? createJavaCatalogV2(source.baseUrl)
+      : createJavaCatalogV1(source);
+  }
   if (process.env.BOOKSTORE_BUILD_PROFILE === 'demo') {
     const { createDemoCatalog } =
       await import('./adapters/demo/catalog.server');
@@ -64,7 +75,7 @@ function cacheScope(source: CatalogSource, locale: Locale) {
   const address = source.profile === 'demo' ? source.dataDir : source.baseUrl;
   return {
     profile: source.profile,
-    contract: source.profile === 'demo' ? 'demo-v1' : 'v1-catalog',
+    contract: source.profile === 'demo' ? 'demo-v1' : source.contract,
     dataset: createHash('sha256').update(address).digest('hex'),
     locale,
   };
@@ -127,7 +138,8 @@ async function cachedBook(key: { scope: Scope; bookId: string }) {
 }
 
 async function categoriesFor(source: CatalogSource) {
-  if (source.profile === 'release') return source.categories;
+  if (source.profile === 'release' && source.contract === 'v1-catalog')
+    return source.categories;
   return (await catalogPort(source)).categories();
 }
 
@@ -136,9 +148,11 @@ export async function readCatalogCategories() {
 }
 
 export async function readCatalog(locale: Locale, query: CatalogQuery) {
-  if (query.q && !supportsCatalogSearch)
+  if (query.q && !supportsCatalogSearch())
     throw new ApiFailure('UNSUPPORTED_FILTER');
   const source = requireSource();
+  if (source.profile === 'release' && source.contract === 'v2-integrated')
+    return (await catalogPort(source)).list(query);
   if (
     !query.q &&
     query.page <= 10 &&
@@ -153,6 +167,8 @@ export async function readCatalog(locale: Locale, query: CatalogQuery) {
 
 export async function readBook(locale: Locale, bookId: string) {
   const source = requireSource();
+  if (source.profile === 'release' && source.contract === 'v2-integrated')
+    return (await catalogPort(source)).get(bookId);
   return cachedBook({ scope: cacheScope(source, locale), bookId }).catch(
     restoreCacheError,
   );

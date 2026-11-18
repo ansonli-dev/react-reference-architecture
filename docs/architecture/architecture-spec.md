@@ -44,6 +44,10 @@
 
 SQLite 在同一事务内创建下单提交、订单和明细，扣减库存并清理该币种的购物车。首次提交同步完成并返回 `201`，重放返回 `200`。响应提供下单提交的 `Location`。订单集合和单笔订单可通过 `GET /api/v1/orders` 与 `GET /api/v1/orders/{orderId}` 读取。[BFF OpenAPI 契约](../../contracts/bff/v1.yaml)
 
+### Java v2 集成购书接口
+
+同源接口继续使用 `/api/v1` 路径。Java v2 集成模式下，BFF 将购物车草稿关联到经认证的主体，使用条目版本执行条件写入，并以 Catalog 的实时价格、库存呈现估算。报价由 Order 创建和存储，确认页随 URL 恢复同一报价。提交返回指向同源提交资源的 `Location`。处理中返回 `202`，以 `PLACED` 且有订单 ID 的快照作为成功依据。拒绝、处理中和待核对分别显示反馈；可用同一报价和幂等键重查提交。订单集合使用 Java 保存的明细快照和创建时间，取消记录可从 `/api/v1/orders/{orderId}/cancellation` 读取或提交。[BFF OpenAPI 契约](../../contracts/bff/v1.yaml)
+
 ## 国际化、主题与可访问性
 
 - 页面使用 URL 的 locale 选择翻译，词典以相同的命名空间和键组织。共享控件通过属性接收文案。语言切换保留路由后缀和查询条件。[语言切换](../../src/app/%5Blocale%5D/language-switch.tsx)

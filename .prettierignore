@@ -8,3 +8,7 @@ test-results
 playwright-report
 src/shared/api/generated
 src/server/adapters/java/generated
+
+# Byte-for-byte snapshots from the Java checkout.
+contracts/java/catalog-v2.yaml
+contracts/java/order-v2.yaml

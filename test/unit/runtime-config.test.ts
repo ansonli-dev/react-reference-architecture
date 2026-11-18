@@ -7,6 +7,16 @@ vi.mock('next/server', () => ({ connection: async () => {} }));
 
 afterEach(() => vi.unstubAllEnvs());
 
+const integratedEnv = {
+  APP_ORIGIN: 'http://localhost:3000',
+  JAVA_CONTRACT: 'v2-integrated',
+  JAVA_CATALOG_BASE_URL: 'http://catalog:8080',
+  JAVA_ORDER_BASE_URL: 'http://order:8080',
+  AUTH_DATABASE_URL: 'postgresql://bookstore:local@postgres/bookstore',
+  OIDC_ISSUER: 'http://localhost:8180/realms/bookstore',
+  OIDC_CLIENT_SECRET: 'local-secret',
+};
+
 describe('runtime configuration', () => {
   it('allows release without Java and keeps liveness independent of readiness', async () => {
     vi.stubEnv('BOOKSTORE_BUILD_PROFILE', 'release');
@@ -32,20 +42,67 @@ describe('runtime configuration', () => {
     });
   });
 
-  it.each(['JAVA_CATALOG_BASE_URL', 'OIDC_ISSUER', 'AUTH_DATABASE_URL'])(
-    'fails closed when v2 is requested without %s',
-    (missing) => {
-      const env: Record<string, string> = {
-        JAVA_CONTRACT: 'v2-integrated',
-        JAVA_CATALOG_BASE_URL: 'http://127.0.0.1:8081',
-        OIDC_ISSUER: 'https://identity.example.test/realms/books',
-        AUTH_DATABASE_URL: 'postgresql://localhost/books',
-      };
-      delete env[missing];
-      expect(() => parseRuntimeEnv(env, 'release')).toThrow(
-        'Invalid runtime configuration',
-      );
+  it.each([
+    'JAVA_CATALOG_BASE_URL',
+    'JAVA_ORDER_BASE_URL',
+    'OIDC_ISSUER',
+    'OIDC_CLIENT_SECRET',
+    'AUTH_DATABASE_URL',
+  ])('fails closed when v2 is requested without %s', (missing) => {
+    expect(() =>
+      parseRuntimeEnv({ ...integratedEnv, [missing]: undefined }, 'release'),
+    ).toThrow('Invalid runtime configuration');
+  });
+
+  it('supports a split loopback issuer and private realm in the local stack', () => {
+    expect(
+      parseRuntimeEnv(
+        {
+          ...integratedEnv,
+          OIDC_INTERNAL_BASE_URL: 'http://keycloak:8080/realms/bookstore/',
+        },
+        'release',
+      ),
+    ).toMatchObject({
+      profile: 'release',
+      javaContract: 'v2-integrated',
+      appOrigin: 'http://localhost:3000',
+      javaCatalogBaseUrl: 'http://catalog:8080',
+      javaOrderBaseUrl: 'http://order:8080',
+      authDatabaseUrl: 'postgresql://bookstore:local@postgres/bookstore',
+      oidcIssuer: 'http://localhost:8180/realms/bookstore',
+      oidcInternalBaseUrl: 'http://keycloak:8080/realms/bookstore',
+      oidcClientId: 'bookstore-bff',
+      oidcClientSecret: 'local-secret',
+    });
+  });
+
+  it('defaults the private realm to the HTTPS issuer', () => {
+    const issuer = 'https://identity.example.test/realms/bookstore';
+    expect(
+      parseRuntimeEnv(
+        {
+          ...integratedEnv,
+          APP_ORIGIN: 'https://books.example.test',
+          OIDC_ISSUER: issuer,
+        },
+        'release',
+      ),
+    ).toMatchObject({ oidcIssuer: issuer, oidcInternalBaseUrl: issuer });
+  });
+
+  it.each([
+    { APP_ORIGIN: 'http://books.example.test' },
+    { OIDC_ISSUER: 'http://identity.example.test/realms/bookstore' },
+    {
+      APP_ORIGIN: 'https://books.example.test',
+      OIDC_ISSUER: 'https://identity.example.test/realms/bookstore',
+      OIDC_INTERNAL_BASE_URL: 'http://keycloak:8080/realms/bookstore',
     },
+  ])('requires HTTPS outside the loopback setup %j', (overrides) =>
+    expect(() =>
+      parseRuntimeEnv({ ...integratedEnv, ...overrides }, 'release'),
+    ).toThrow('Invalid runtime configuration'),
   );
 
   it.each(['https://books.example.test', 'http://127.0.0.1.evil.test'])(

@@ -19,15 +19,20 @@ import {
   type OrderQuote,
 } from '@/features/checkout/model';
 import { routing, type Locale } from '@/i18n/routing';
-import { readDemoShop } from '@/server/demo-shop.server';
+import {
+  checkoutEnabled,
+  integratedEnabled,
+} from '@/server/config/runtime.server';
+import { readShop } from '@/server/shop.server';
 import { ApiFailure } from '@/shared/api/error';
 import { Button } from '@/shared/ui/button';
 import { Input } from '@/shared/ui/input';
 
+import { CheckoutSignIn } from '../../checkout-sign-in';
+
 type Props = PageProps<'/[locale]/cart'>;
 
 export default async function CartPage({ params, searchParams }: Props) {
-  if (process.env.BOOKSTORE_BUILD_PROFILE !== 'demo') notFound();
   const { locale } = await params;
   if (!hasLocale(routing.locales, locale)) notFound();
   setRequestLocale(locale);
@@ -58,25 +63,34 @@ async function CartContent({
   searchParams: Props['searchParams'];
 }) {
   await connection();
+  if (!checkoutEnabled()) notFound();
   const t = await getTranslations({ locale, namespace: 'Checkout' });
   const { notice: rawNotice, quote: rawQuote } = await searchParams;
   const quoteId = shopperIdSchema.safeParse(rawQuote).data;
   let notice = checkoutNoticeSchema.safeParse(rawNotice).data;
+  const returnTo =
+    '/' + locale + '/cart' + (quoteId ? '?quote=' + quoteId : '');
   let groups: CartGroup[];
   let quote: OrderQuote | null = null;
   try {
-    const session = await readDemoShop();
+    const shop = await readShop();
     if (quoteId) {
-      quote = session?.shop.quote(session.shopper, quoteId) ?? null;
+      quote = await shop.quote(quoteId).catch((error: unknown) => {
+        if (error instanceof ApiFailure && error.code === 'RESOURCE_NOT_FOUND')
+          return null;
+        throw error;
+      });
       if (!quote) notice = 'quoteMissing';
     }
-    groups = quote ? [] : (session?.shop.cart(session.shopper) ?? []);
+    groups = quote ? [] : await shop.cart();
   } catch (error) {
     if (!(error instanceof ApiFailure)) throw error;
+    if (error.code === 'UNAUTHENTICATED')
+      return <CheckoutSignIn locale={locale} returnTo={returnTo} />;
     return (
       <CatalogNotice
         message={t('notices.unavailable')}
-        href={'/' + locale + '/cart' + (quoteId ? '?quote=' + quoteId : '')}
+        href={returnTo}
         action={t('retry')}
       />
     );
@@ -333,7 +347,7 @@ async function QuoteConfirmation({
           }}
         >
           <CheckoutButton
-            label={t('placeOrder')}
+            label={t(integratedEnabled() ? 'placeLiveOrder' : 'placeOrder')}
             pendingLabel={t('placing')}
             blocked={false}
           />

@@ -8,6 +8,14 @@ const specs = [
     'contracts/java/catalog-v1.yaml',
     'src/server/adapters/java/generated/catalog-v1.ts',
   ],
+  [
+    'contracts/java/catalog-v2.yaml',
+    'src/server/adapters/java/generated/catalog-v2.ts',
+  ],
+  [
+    'contracts/java/order-v2.yaml',
+    'src/server/adapters/java/generated/order-v2.ts',
+  ],
 ];
 
 for (const [source, target] of specs) {

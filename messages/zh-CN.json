@@ -10,7 +10,9 @@
     "theme": "切换深色主题",
     "skip": "跳至内容",
     "notFound": "找不到这个页面",
-    "backToCatalog": "返回目录"
+    "backToCatalog": "返回目录",
+    "signIn": "登录",
+    "signOut": "退出登录"
   },
   "Catalog": {
     "title": "书籍目录",
@@ -86,7 +88,20 @@
       "consumed": "这份报价已提交，请查看订单记录。",
       "conflict": "本次提交与已有记录冲突，请重新核对报价。",
       "processing": "订单仍在处理。可再次提交同一报价查询结果。",
-      "reconcile": "订单结果待核对。可再次提交同一报价查询结果。"
+      "reconcile": "订单结果待核对。可再次提交同一报价查询结果。",
+      "signIn": "登录后即可使用购物车并查看订单。",
+      "email": "核对报价前，请先验证账户邮箱。",
+      "intake": "书店暂时暂停结算，购物车已保存。",
+      "currency": "结算目前仅支持人民币。"
+    },
+    "placeLiveOrder": "提交订单",
+    "pagination": "订单分页",
+    "orderStatus": {
+      "PENDING": "待处理",
+      "PLACED": "已下单",
+      "CONFIRMED": "已确认",
+      "SHIPPED": "已发货",
+      "CANCELLED": "已取消"
     }
   }
 }
