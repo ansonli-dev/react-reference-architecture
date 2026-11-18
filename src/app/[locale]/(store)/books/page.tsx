@@ -8,7 +8,6 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import {
   BookCard,
   CatalogFilters,
-  CatalogNotice,
   catalogHref,
 } from '@/features/catalog/client';
 import { parseCatalogQuery, type CatalogQuery } from '@/features/catalog/model';
@@ -16,6 +15,7 @@ import { routing, type Locale } from '@/i18n/routing';
 import { readCatalog, readCatalogCategories } from '@/server/catalog.server';
 import { reportCatalogFailure } from '@/server/observability/catalog.server';
 import { ApiFailure } from '@/shared/api/error';
+import { ActionNotice } from '@/shared/ui/action-notice';
 
 type BooksProps = PageProps<'/[locale]/books'>;
 
@@ -75,7 +75,7 @@ async function CatalogContent({
   } catch (error) {
     if (!(error instanceof ApiFailure)) throw error;
     return (
-      <CatalogNotice message={t('invalid')} href={base} action={t('reset')} />
+      <ActionNotice message={t('invalid')} href={base} action={t('reset')} />
     );
   }
 
@@ -90,7 +90,7 @@ async function CatalogContent({
     if (!(error instanceof ApiFailure)) throw error;
     reportCatalogFailure('page.catalog.list', error, startedAt);
     return (
-      <CatalogNotice
+      <ActionNotice
         message={t('unavailable')}
         href={catalogHref(base, query)}
         action={t('retry')}

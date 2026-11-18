@@ -10,7 +10,7 @@ export async function CheckoutSignIn({
 }: {
   locale: Locale;
   returnTo: string;
-  intent: 'add' | 'cart' | 'orders';
+  intent: 'add' | 'cart' | 'orders' | 'resume';
 }) {
   const [shell, checkout] = await Promise.all([
     getTranslations({ locale, namespace: 'Shell' }),
@@ -18,7 +18,10 @@ export async function CheckoutSignIn({
   ]);
   return (
     <div className="border-line bg-surface mt-4 rounded-xl border p-4 sm:p-5">
-      <p className="text-foreground text-sm font-medium">
+      <p
+        role={intent === 'resume' ? 'alert' : undefined}
+        className="text-foreground text-sm font-medium"
+      >
         {checkout('auth.' + intent)}
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1">

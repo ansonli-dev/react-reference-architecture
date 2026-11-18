@@ -40,13 +40,13 @@
 
 ### 本地购书接口
 
-演示的 BFF 用 `GET /api/v1/cart`、`PUT /api/v1/cart/items/{bookId}` 和 `DELETE /api/v1/cart/items/{bookId}` 管理购物车。加购先读取条目，再用 `If-Match` 设置下一数量，首次创建使用 `If-None-Match: *`。同一浏览器的标签页依次加购，以便共用首次加购建立的会话。购物车按页面读取到的条目版本更新和删除，版本变化时返回 `412`，页面提示核对最新数量。页面用 `POST /api/v1/order-quotes` 创建报价，客户端可读取 `Location` 指向的快照。确认页从 URL 恢复同一个报价。演示前端以报价 ID 作为稳定的幂等键。
+演示的 BFF 用 `GET /api/v1/cart`、`PUT /api/v1/cart/items/{bookId}` 和 `DELETE /api/v1/cart/items/{bookId}` 管理购物车。加购先读取条目，再用 `If-Match` 设置下一数量，首次创建使用 `If-None-Match: *`。浏览器提供 Web Locks 时，同源标签页的加购会串行，后续加购可使用首次响应设置的会话 Cookie。现有首次跨标签加购用例运行在 Chromium。缺少 Web Locks 时直接执行加购。购物车按页面读取到的条目版本更新和删除，版本变化时返回 `412`，页面提示核对最新数量。页面用 `POST /api/v1/order-quotes` 创建报价，客户端可读取 `Location` 指向的快照。确认页从 URL 恢复同一个报价。演示前端以报价 ID 作为稳定的幂等键。[加购实现](../../src/features/checkout/ui/checkout-form.tsx) · [首次跨标签加购用例](../../test/e2e/bookstore-checkout.spec.ts#L6)
 
 SQLite 在同一事务内创建下单提交、订单和明细，扣减库存并清理该币种的购物车。首次提交同步完成并返回 `201`，重放返回 `200`。响应提供下单提交的 `Location`。订单集合和单笔订单可通过 `GET /api/v1/orders` 与 `GET /api/v1/orders/{orderId}` 读取。[BFF OpenAPI 契约](../../contracts/bff/v1.yaml)
 
 ### Java 集成购书接口
 
-浏览器调用同源 `/api/v1` 接口。发布模式下，BFF 在 PostgreSQL 中按认证主体保存购物车草稿，使用条目版本执行条件写入，并以 Catalog 的实时价格、库存呈现估算。报价由 Order 创建和存储，确认页随 URL 恢复同一报价。提交返回指向同源提交资源的 `Location`。处理中返回 `202`，以 `PLACED` 且有订单 ID 的快照作为成功依据。拒绝、处理中和待核对分别显示反馈。可用同一报价和幂等键重查提交。订单集合使用 Java 保存的明细快照和创建时间，取消记录可从 `/api/v1/orders/{orderId}/cancellation` 读取或提交。[BFF OpenAPI 契约](../../contracts/bff/v1.yaml) · [Java v1 契约](../../contracts/java/README.md)
+浏览器调用同源 `/api/v1` 接口。发布模式下，BFF 在 PostgreSQL 中按认证主体保存购物车草稿，使用条目版本执行条件写入，并以 Catalog 的实时价格、库存呈现估算。报价由 Order 创建和存储，确认页随 URL 恢复同一报价。提交返回指向同源提交资源的 `Location`。`202` 表示提交已受理且尚无最终结果。`PROCESSING` 触发有限轮询，`RECONCILE_REQUIRED` 提示等待核对并可手动重查。以 `PLACED` 且有订单 ID 的快照作为成功依据。可用同一报价和幂等键重查提交。订单集合使用 Java 保存的明细快照和创建时间，取消记录可从 `/api/v1/orders/{orderId}/cancellation` 读取或提交。[BFF OpenAPI 契约](../../contracts/bff/v1.yaml) · [Java v1 契约](../../contracts/java/README.md)
 
 ## 国际化、主题与可访问性
 

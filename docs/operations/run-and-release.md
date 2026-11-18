@@ -11,7 +11,7 @@
 | 生产构建、启动 | `pnpm build:demo`、`pnpm start:demo` | `pnpm build`、`pnpm start`          |
 | 产物           | `.next-demo/`                        | `.next/`                            |
 
-两个模式的 `/en` 与 `/zh-CN` 都重定向到对应语言的书籍目录。目录在运行时读取数据，构建可独立执行。启动后，`GET /api/health` 返回进程存活状态，`GET /api/ready` 会实际读一次目录。数据源缺失、不可读或配置不合法时，就绪返回 503 与有限的原因码；进程健康仍可返回 200。已知语言的未匹配路径返回本地化 HTTP 404。书籍详情流式缺失时响应头可能已是 200，同一书号的 BFF 响应仍是 404。
+两个模式的 `/en` 与 `/zh-CN` 都重定向到对应语言的书籍目录。目录在运行时读取数据，构建可独立执行。启动后，`GET /api/health` 返回进程存活状态。`GET /api/ready` 检查运行配置能否解析并实际读一次目录。数据源缺失、不可读或配置不合法时，就绪返回 503 与有限的原因码；进程健康仍可返回 200。已知语言的未匹配路径返回本地化 HTTP 404。书籍详情流式缺失时响应头可能已是 200，同一书号的 BFF 响应仍是 404。
 
 ## 配置
 
@@ -31,9 +31,11 @@
 
 故障日志中 `event=catalog.read_failed` 记录固定的目录入口、请求 ID、分类状态与耗时。用 BFF 响应里的 `error.requestId` 搜索同一个 ID；页面降级事件按入口和时间定位。页面日志的 `status` 是分类状态，流式 HTML 可能已经发出 200。运行时凭据不进入这些记录。
 
+报价与提交资源的 5xx 会记录 `event=checkout.request_failed`。用 BFF 响应的 `error.requestId` 关联操作名、错误码、HTTP 状态和耗时。[结算关联测试](../../test/unit/checkout-observability.test.ts)
+
 ## Java 集成
 
-本地联调可用 Java 仓库的 `demo/compose.yaml` 和 `demo/compose.frontend.yaml` 启动完整环境。后端 `demo/README.md` 记录启动步骤。[Java OpenAPI 契约](../../contracts/java/README.md)
+本地联调可用 Java 仓库的 `demo/compose.yaml` 和 `demo/compose.frontend.yaml` 启动完整环境。后端 `demo/README.md` 记录启动步骤。[Java 仓库](https://github.com/ansonli-dev/explicit-architecture) · [Java OpenAPI 契约](../../contracts/java/README.md) · [真实 Java 与 Keycloak 验证](../testing-strategy/README.md#真实-java-与-keycloak-联调)
 
 在独立的 BFF PostgreSQL 数据库执行 [会话建表](../../database/auth.sql) 和 [购物车建表](../../database/cart.sql)。配置 Java Catalog 和 Order 服务的地址以及 Keycloak 客户端，再用同一个发布构建执行 `pnpm start`。访问 `/zh-CN/books` 或 `/en/books`，点击注册或登录。验证邮箱并登录后，可从详情加购，核对人民币报价，提交订单并重新打开订单列表。
 
@@ -86,7 +88,9 @@ docker build --label "org.opencontainers.image.revision=$release_sha" -t "bookst
 docker image inspect --format '{{.Id}} {{index .Config.Labels "org.opencontainers.image.revision"}}' "bookstore:$release_sha"
 ```
 
-烟测在内部 Docker 网络启动仓库自带的目录替身，核对发布镜像的健康、就绪、双语目录、静态资源与同源 BFF。下例从回环访问发布镜像，`$release_env_file` 提供运行配置，`$catalog_network` 是部署网络。
+普通 CI 的 Release 端到端测试使用目录替身，覆盖发布构建的目录和匿名访问边界。镜像烟测在内部 Docker 网络使用隔离的目录替身，核对镜像的健康、就绪、双语目录、静态资源与同源 BFF。账户、邮件、PostgreSQL 草稿与 Java Order 由独立联调验证。[普通 CI](../../.github/workflows/ci.yml) · [镜像烟测](../../scripts/test-release.sh) · [真实 Java 与 Keycloak 联调](../testing-strategy/README.md#真实-java-与-keycloak-联调)
+
+下例从回环访问发布镜像，`$release_env_file` 提供运行配置，`$catalog_network` 是部署网络。
 
 ```bash
 docker run -d --name bookstore-current --network "$catalog_network" \

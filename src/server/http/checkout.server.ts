@@ -8,12 +8,34 @@ import {
 import { ApiFailure } from '@/shared/api/error';
 import { apiErrorResponse } from './response.server';
 
-export async function checkoutResponse(run: () => Promise<Response>) {
+type CheckoutOperation =
+  | 'api.checkout.quote.create'
+  | 'api.checkout.quote.read'
+  | 'api.checkout.submission.create'
+  | 'api.checkout.submission.read';
+
+export async function checkoutResponse(
+  run: () => Promise<Response>,
+  operation?: CheckoutOperation,
+) {
   await connection();
+  const startedAt = performance.now();
   try {
     return await run();
   } catch (error) {
-    return apiErrorResponse(error);
+    return apiErrorResponse(error, (failure, requestId) => {
+      if (!operation || failure.status < 500) return;
+      console.error(
+        JSON.stringify({
+          event: 'checkout.request_failed',
+          operation,
+          requestId,
+          code: failure.code,
+          status: failure.status,
+          durationMs: Math.max(0, Math.round(performance.now() - startedAt)),
+        }),
+      );
+    });
   }
 }
 

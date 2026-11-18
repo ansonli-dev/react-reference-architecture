@@ -12,5 +12,5 @@ export function POST(request: Request) {
     return apiJson(quote, 201, {
       Location: '/api/v1/order-quotes/' + quote.quoteId,
     });
-  });
+  }, 'api.checkout.quote.create');
 }

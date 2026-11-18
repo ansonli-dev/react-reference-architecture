@@ -19,7 +19,8 @@
 
 ## 取舍与证据
 
-- 页面与 HTTP 各自校验入口输入，再调用同一个读取器。公开缓存按数据源、语言及查询或 UUID 隔离。返回链接和故障日志处在读取边界外，不进入缓存键。[缓存 ADR](0002-public-reads-and-cache.md) · [读取器](../../src/server/catalog.server.ts)
+- 页面与 HTTP 各自校验入口输入，再调用同一个读取器。Demo 的缓存策略让两个入口共用符合条件的公开读取，缓存按数据集、语言及查询或 UUID 隔离。返回链接和故障日志处在读取边界外，不进入缓存键。[缓存 ADR](0002-public-reads-and-cache.md) · [读取器](../../src/server/catalog.server.ts)
 - 两个 RSC 只在 `connection()` 之后读取单调时钟，为请求失败计时。时间只进入日志，不参与渲染或缓存；React 纯度检查的例外仅限这两处取样。
 - 构建会检查浏览器中实际用到的模块。架构检查还覆盖未被浏览器用到的 `client.ts`，例如它经别名和中间模块重导 `server-only` 仍会失败。保持 type-only 例外。Lint 约束纯模型中的全局 `fetch`，目录请求由服务端适配器发出。[架构反例](../../test/unit/architecture.test.ts)
-- 生产构建的测试核对浏览器和同源接口返回的书目，以及同语言的页面与 HTTP 热读复用公开缓存。目录替身响应较慢时，页面先返回静态外壳。[目录旅程](../../test/e2e/catalog-journey.spec.ts) · [HTTP 用例](../../test/e2e/catalog-http.spec.ts)
+- 生产用例核对筛选后的页面和 JSON 返回相同书目。Release 用例通过目录替身的请求计数确认详情页面和 HTTP 详情每次都读取 Java，并观察到上游延迟时页面先返回静态外壳。Demo 用例确认成交后详情接口返回扣减后的库存。[书目一致](../../test/e2e/catalog-journey.spec.ts#L53) · [Release 读取次数](../../test/e2e/catalog-journey.spec.ts#L322) · [流式外壳](../../test/e2e/catalog-journey.spec.ts#L279) · [Demo 库存更新](../../test/e2e/bookstore-checkout-http.spec.ts#L116)
+- 验证 Demo 跨入口缓存命中次数需要在生产构建中，以相同语言和规范化查询依次访问两个入口，并计数底层读取。

@@ -6,25 +6,19 @@ import { ArrowLeft, ShoppingBag } from 'lucide-react';
 import { hasLocale } from 'next-intl';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import {
-  BookCover,
-  CatalogNotice,
-  formatBookPrice,
-} from '@/features/catalog/client';
-import { CheckoutButton, CheckoutForm } from '@/features/checkout/client';
-import {
   checkoutNoticeSchema,
-  maxBookQuantity,
   shopperIdSchema,
   type CartGroup,
   type OrderQuote,
 } from '@/features/checkout/model';
+import { CurrencyCart, QuoteConfirmation } from '@/features/checkout/server';
 import { routing, type Locale } from '@/i18n/routing';
 import { readShop } from '@/server/shop.server';
 import { ApiFailure } from '@/shared/api/error';
+import { ActionNotice } from '@/shared/ui/action-notice';
 import { Button } from '@/shared/ui/button';
-import { Input } from '@/shared/ui/input';
-
 import { CheckoutSignIn } from '../../checkout-sign-in';
+import { renderBookThumbnail } from '../book-thumbnail';
 
 type Props = PageProps<'/[locale]/cart'>;
 
@@ -65,6 +59,15 @@ async function CartContent({
   let notice = checkoutNoticeSchema.safeParse(rawNotice).data;
   const returnTo =
     '/' + locale + '/cart' + (quoteId ? '?quote=' + quoteId : '');
+  if (notice === 'signIn' && process.env.BOOKSTORE_BUILD_PROFILE === 'release')
+    return (
+      <CheckoutSignIn
+        locale={locale}
+        returnTo={returnTo}
+        intent={quoteId ? 'resume' : 'cart'}
+      />
+    );
+
   let groups: CartGroup[];
   let quote: OrderQuote | null = null;
   try {
@@ -85,7 +88,7 @@ async function CartContent({
         <CheckoutSignIn locale={locale} returnTo={returnTo} intent="cart" />
       );
     return (
-      <CatalogNotice
+      <ActionNotice
         message={t('notices.unavailable')}
         href={returnTo}
         action={t('retry')}
@@ -103,7 +106,15 @@ async function CartContent({
         </p>
       )}
       {quote ? (
-        <QuoteConfirmation locale={locale} quote={quote} />
+        <QuoteConfirmation
+          locale={locale}
+          quote={quote}
+          submitLabel={t(
+            process.env.BOOKSTORE_BUILD_PROFILE === 'demo'
+              ? 'placeOrder'
+              : 'placeLiveOrder',
+          )}
+        />
       ) : groups.length === 0 ? (
         <div className="border-line bg-surface mt-6 grid justify-items-center gap-4 rounded-xl border px-4 py-12 text-center">
           <span className="bg-accent text-primary grid size-12 place-items-center rounded-xl">
@@ -124,6 +135,7 @@ async function CartContent({
                 key={group.currency}
                 locale={locale}
                 group={group}
+                renderCover={renderBookThumbnail}
               />
             ))}
           </div>
@@ -137,230 +149,5 @@ async function CartContent({
         </>
       )}
     </>
-  );
-}
-
-async function CurrencyCart({
-  locale,
-  group,
-}: {
-  locale: Locale;
-  group: CartGroup;
-}) {
-  const t = await getTranslations({ locale, namespace: 'Checkout' });
-  const catalog = await getTranslations({ locale, namespace: 'Catalog' });
-  const { currency, lines, totalMinor, revision } = group;
-  const cartPath = '/' + locale + '/cart';
-  const unavailable = lines.some((line) => line.quantity > line.stock);
-  return (
-    <section
-      aria-labelledby={'cart-' + currency}
-      className="grid items-start gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.48fr)] lg:gap-6"
-    >
-      <div className="border-line bg-surface rounded-xl border">
-        <h2
-          id={'cart-' + currency}
-          className="border-line border-b px-4 py-4 text-base font-semibold sm:px-5"
-        >
-          {new Intl.DisplayNames(locale, { type: 'currency' }).of(currency)}
-        </h2>
-        <ul className="divide-line divide-y">
-          {lines.map((line) => (
-            <li
-              key={line.bookId}
-              className="flex items-start gap-3 px-4 py-5 sm:gap-4 sm:px-5"
-            >
-              <BookCover
-                book={{ id: line.bookId, title: line.title }}
-                size="thumbnail"
-              />
-              <div className="min-w-0 grow">
-                <div className="flex flex-wrap items-start justify-between gap-x-5 gap-y-1">
-                  <Link
-                    href={'/' + locale + '/books/' + line.bookId}
-                    prefetch={false}
-                    className="hover:text-primary rounded-sm text-base font-semibold wrap-anywhere hover:underline"
-                  >
-                    {line.title}
-                  </Link>
-                  <span className="text-muted text-sm tabular-nums">
-                    {t('unitPrice', {
-                      price: formatBookPrice(locale, { ...line, currency }),
-                    })}
-                  </span>
-                </div>
-                {line.quantity > line.stock && (
-                  <p className="text-muted mt-2 text-sm">
-                    {line.stock
-                      ? catalog('stock', { count: line.stock })
-                      : catalog('soldOut')}
-                  </p>
-                )}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <CheckoutForm
-                    cartPath={cartPath}
-                    operation={{
-                      type: 'update',
-                      bookId: line.bookId,
-                      etag: line.etag,
-                    }}
-                    className="flex items-center gap-2"
-                  >
-                    <label htmlFor={'qty-' + line.bookId} className="sr-only">
-                      {t('quantity')}
-                    </label>
-                    <Input
-                      id={'qty-' + line.bookId}
-                      key={line.quantity}
-                      name="quantity"
-                      type="number"
-                      min={1}
-                      max={maxBookQuantity}
-                      required
-                      defaultValue={line.quantity}
-                      className="h-11 w-14"
-                    />
-                    <Button
-                      type="submit"
-                      variant="outline"
-                      className="h-11 px-3"
-                    >
-                      {t('update')}
-                    </Button>
-                  </CheckoutForm>
-                  <CheckoutForm
-                    cartPath={cartPath}
-                    operation={{
-                      type: 'remove',
-                      bookId: line.bookId,
-                      etag: line.etag,
-                    }}
-                  >
-                    <Button
-                      type="submit"
-                      variant="ghost"
-                      aria-label={t('remove', { title: line.title })}
-                      className="text-muted h-11 px-3"
-                    >
-                      {t('removeLabel')}
-                    </Button>
-                  </CheckoutForm>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </div>
-      <CheckoutForm
-        cartPath={cartPath}
-        operation={{ type: 'quote', currency, revision }}
-        className="border-line bg-surface rounded-xl border p-4 sm:p-5"
-      >
-        <h3 className="text-lg font-bold">{t('summary')}</h3>
-        <p className="text-muted mt-1 text-sm">
-          {t('itemCount', {
-            count: lines.reduce((sum, line) => sum + line.quantity, 0),
-          })}
-        </p>
-        <div className="border-line mt-4 flex flex-wrap items-baseline justify-between gap-3 border-t pt-4">
-          <span className="font-medium">{t('subtotal')}</span>
-          {totalMinor !== null && (
-            <p className="text-2xl font-bold tracking-tight tabular-nums">
-              {formatBookPrice(locale, { priceMinor: totalMinor, currency })}
-            </p>
-          )}
-        </div>
-        {(totalMinor === null || unavailable) && (
-          <p className="text-muted mt-3 text-sm" role="status">
-            {t(totalMinor === null ? 'notices.total' : 'notices.stock')}
-          </p>
-        )}
-        <div className="mt-4">
-          <CheckoutButton
-            label={t('quote')}
-            pendingLabel={t('quoting')}
-            blocked={totalMinor === null || unavailable}
-          />
-        </div>
-      </CheckoutForm>
-    </section>
-  );
-}
-
-async function QuoteConfirmation({
-  locale,
-  quote,
-}: {
-  locale: Locale;
-  quote: OrderQuote;
-}) {
-  const t = await getTranslations({ locale, namespace: 'Checkout' });
-  const cartPath = '/' + locale + '/cart';
-  const time = new Intl.DateTimeFormat(locale, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(quote.expiresAt));
-  return (
-    <section className="mt-6 max-w-2xl" aria-labelledby="confirm-quote">
-      <div className="border-line bg-surface rounded-xl border p-4 sm:p-6">
-        <h2 id="confirm-quote" className="text-xl font-bold">
-          {t('confirmQuote')}
-        </h2>
-        <p className="text-muted mt-1 text-sm">{t('expiresAt', { time })}</p>
-        <ul className="divide-line border-line mt-4 divide-y border-y">
-          {quote.lines.map((line) => (
-            <li
-              key={line.bookId}
-              className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3"
-            >
-              <span className="font-medium wrap-anywhere">{line.title}</span>
-              <span className="text-muted text-sm">
-                {t('orderLine', {
-                  quantity: line.quantity,
-                  price: formatBookPrice(locale, {
-                    ...line,
-                    currency: quote.currency,
-                  }),
-                })}
-              </span>
-            </li>
-          ))}
-        </ul>
-        <div className="my-4 flex items-baseline justify-between gap-3 font-semibold">
-          <span>{t('total')}</span>
-          <span className="text-2xl tabular-nums">
-            {formatBookPrice(locale, {
-              currency: quote.currency,
-              priceMinor: quote.totalMinor,
-            })}
-          </span>
-        </div>
-        <CheckoutForm
-          cartPath={cartPath}
-          operation={{
-            type: 'submit',
-            quoteId: quote.quoteId,
-            ordersPath: '/' + locale + '/orders',
-          }}
-        >
-          <CheckoutButton
-            label={t(
-              process.env.BOOKSTORE_BUILD_PROFILE === 'demo'
-                ? 'placeOrder'
-                : 'placeLiveOrder',
-            )}
-            pendingLabel={t('placing')}
-            blocked={false}
-          />
-        </CheckoutForm>
-      </div>
-      <Link
-        href={cartPath}
-        prefetch={false}
-        className="text-primary mt-4 inline-flex min-h-11 items-center gap-2 rounded-sm text-sm font-medium hover:underline"
-      >
-        <ArrowLeft size={16} aria-hidden /> {t('backToCart')}
-      </Link>
-    </section>
   );
 }
