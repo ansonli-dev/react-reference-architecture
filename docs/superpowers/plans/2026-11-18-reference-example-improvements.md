@@ -29,8 +29,8 @@
 
 ### Task 3 验证异步处理、丢响应和版本清理
 
-- [ ] 扩充 `test/e2e/bookstore-checkout.spec.ts`。持续 `PROCESSING` 用例验证轮询耗尽后提示处理中并保留报价，`RECONCILE_REQUIRED` 用例验证提示待核对、保留报价且停止自动轮询。丢响应场景让 Demo 真实落单，再丢弃浏览器响应，重试核对订单 ID、库存和幂等键。复用普通 CI 与 SQLite 种子。在 `test/integration/demo-checkout.test.ts` 用现有可控时钟验证已受理提交在报价到期后仍可重放。
-- [ ] 在 `test/live-java/checkout.spec.ts` 用可控的操作 401 验证真实登录回跳。购物车读取仍成功时也应提供登录动作。确认进入 Keycloak、回到同一报价、由用户手动提交并复用原幂等键。
+- [ ] 扩充 `test/e2e/bookstore-checkout.spec.ts`。持续 `PROCESSING` 用例验证轮询耗尽后提示处理中并保留报价，初始 `RECONCILE_REQUIRED` 用例验证提示待核对、保留报价且自动轮询次数为零。两个场景手动继续时都沿用原幂等键。丢响应场景让 Demo 真实落单，再丢弃浏览器响应，重试核对订单 ID、库存和幂等键。复用普通 CI 与 SQLite 种子。在 `test/integration/demo-checkout.test.ts` 复用隔离数据库内的报价过期设置，验证已受理提交在报价到期后仍可重放。
+- [ ] 在 `test/live-java/checkout.spec.ts` 用可控的操作 401 验证真实登录回跳。确认同一个 BFF 会话能读购物车和报价，仍有明确登录动作。核对实际进入 Keycloak、回到同一报价、由用户手动提交并复用原幂等键。留出一个未受理过的真实提交，核对 Java 初始 202 与 `PROCESSING`、准确的 `Location` 和浏览器对该地址的查询。
 - [ ] 在 `test/live-java/checkout.spec.ts` 增加同账户的版本清理用例。报价包含两行，在报价后修改其中一行。原报价提交成功后，未修改的行被清理，修改过的行及其新版本保留。用同一幂等键重放，确认新行仍在且订单只有一笔。
 - [ ] 在已有联调环境执行 Release 用例时，记录实际通过的前后端提交、种子条件与联调结果。环境缺失时，在案例证据中标记待联调。
 
@@ -40,13 +40,14 @@
 
 ### Task 4 让结算请求体现 OpenAPI 契约
 
-- [ ] 在新增的 `src/features/checkout/api.ts` 声明 `createQuote`、`submitQuote` 和 `getSubmission`，接入已有的 `shared/api/client.ts`。请求模块读取状态码和响应头，用 Zod 校验会改变流程的响应。现有 `submitOrder` 调用提交和查询请求，负责何时轮询及停止。表单处理用户操作、反馈和导航。
+- [ ] 在新增的 `src/features/checkout/api.ts` 声明 `createQuote`、`submitQuote` 和 `getSubmission`，接入已有的 `shared/api/client.ts`。保留每次请求 8 秒的期限与 `no-store`。校验 OpenAPI 客户端已解析的 `data` 或 `error`，从原 `Response` 读取 `Location`。现有 `submitOrder` 调用提交和查询请求，负责何时轮询及停止。表单处理用户操作、反馈和导航。
+- [ ] 用可控浏览器响应核对错误的 `Location`、格式不正确的 JSON、响应的提交 ID 与路径 ID 不一致。无效响应显示可恢复的错误，避免把错误提交认成订单。任务 2 与 3 的 401、202 和原幂等键回归验证迁移前后的行为。
 
 **验收**　生成类型约束请求路径、参数和请求体。用例检查 `Location`、稳定幂等键和现有的恢复行为，并验证提交响应超时时保留原报价。购物车的 `ETag` 条件写入与 `412` 回归通过。[类型客户端](../../../src/shared/api/client.ts) · [BFF 契约](../../../contracts/bff/v1.yaml)
 
 ### Task 5 按业务职责提取结算视图
 
-- [ ] 优先评估报价确认、币种购物车和订单列表。将能独立变化的视图放到结算 feature，通过对应运行环境的公开入口导出。路由负责参数、服务端读取与跨 feature 组合。已被目录和结算共用的 `CatalogNotice` 可迁入 `shared/ui`，文案和动作由调用方传入。书封等书籍语义由目录提供。
+- [ ] 优先评估报价确认、币种购物车和订单列表。将能独立变化的服务端视图放到结算 feature，从 `features/checkout/server.ts` 导出。路由负责参数、服务端读取与跨 feature 组合，由应用传入书封与格式化价格需要的能力。通用的金额格式化可以放在 shared。已被目录和结算共用的 `CatalogNotice` 迁入 `shared/ui`，文案和动作由调用方传入。
 
 **验收**　改动对应明确的业务职责。页面仍能验证加购、编辑、报价、下单与订单记录。公开入口约束和服务端依赖检查通过。[购物车页](<../../../src/app/%5Blocale%5D/(store)/cart/page.tsx>) · [订单页](<../../../src/app/%5Blocale%5D/(store)/orders/page.tsx>) · [依赖规则](../../architecture/architecture-spec.md#公开入口与依赖方向)
 
@@ -60,4 +61,6 @@
 
 任务 1 和 2 可并行。任务 2 是把登录中断恢复列为已验证示例的前提，任务 3 在此基础上提升异步交易的证据强度。任务 4 在恢复用例通过后开展。任务 5、6 可独立评审。
 
-文档改动核对链接与 `pnpm check`。结算行为与边界改动使用 `pnpm check`、`pnpm api:check`、`pnpm test`、`pnpm build`、`pnpm build:demo` 与对应的普通 Playwright 用例验证。需要 Keycloak、PostgreSQL 和 Java Order 同时协作的用例由 `pnpm test:e2e:java` 提供独立证据。
+文档改动核对链接与 `pnpm check`。功能分支最终验收从干净的候选提交运行 `pnpm peers check`、`pnpm check`、`pnpm api:check`、`pnpm test`、`pnpm build`、`pnpm build:demo`、全量 `pnpm test:e2e`、`bash scripts/test-visual.sh`、`bash scripts/test-release.sh` 和 `pnpm test:e2e:java`。Java 用例使用隔离种子以及实际 Keycloak、PostgreSQL 和 Java Order，记录与前端候选提交对应的结果。
+
+提交供全分支对抗性评审。推送后核对当前 PR 提交的普通检查、视觉与镜像烟测均通过，再按已审核的 head 合入 `main`，核对 GitHub 合并提交和更新后的远端 `main`。
