@@ -14,6 +14,7 @@ import type { components } from '../../src/shared/api/generated/bff';
 const quotes = '/api/v1/order-quotes';
 const submissions = '/api/v1/order-submissions';
 const orders = '/api/v1/orders';
+const storefront = 'http://localhost:3000';
 const keycloak = 'http://localhost:8180/realms/bookstore';
 const settled = { timeout: 20_000 };
 const currency = new Intl.NumberFormat('en', {
@@ -65,22 +66,70 @@ async function signIn(page: Page, reader: Reader) {
   await expect(page.getByText('My account', { exact: true })).toBeVisible();
 }
 
-async function authenticate(page: Page, reader: Reader) {
+async function authenticate(
+  page: Page,
+  reader: Reader,
+  mode: 'sign-in' | 'reauthenticate' = 'sign-in',
+) {
   await expect(page).toHaveURL((url) => {
     return (
       url.origin + url.pathname ===
         keycloak + '/protocol/openid-connect/auth' &&
       url.searchParams.get('client_id') === 'bookstore-bff' &&
       url.searchParams.get('redirect_uri') ===
-        'http://localhost:3000/api/auth/oauth2/callback/keycloak' &&
+        storefront + '/api/auth/oauth2/callback/keycloak' &&
       url.searchParams.get('code_challenge_method') === 'S256' &&
       Boolean(url.searchParams.get('code_challenge')) &&
       Boolean(url.searchParams.get('state'))
     );
   });
-  await page.locator('#username').fill(reader);
+  if (mode === 'reauthenticate')
+    await expect(page.locator('#kc-attempted-username')).toHaveValue(reader);
+  else await page.locator('#username').fill(reader);
   await page.locator('#password').fill(reader + '-local');
   await page.locator('#kc-login').click();
+}
+
+async function withCartCleanup(
+  request: APIRequestContext,
+  books: SeedBook[],
+  run: () => Promise<void>,
+) {
+  let completed = false;
+  try {
+    await run();
+    completed = true;
+  } finally {
+    const results = await Promise.allSettled(
+      books.map(async (book) => {
+        const path = '/api/v1/cart/items/' + book.id;
+        const item = await request.get(path);
+        if (item.status() === 404) return;
+        await expect(item).toBeOK();
+        const etag = item.headers().etag;
+        assert(etag, 'Missing version for fixture cleanup');
+        const deleted = await request.delete(path, {
+          headers: { Origin: storefront, 'If-Match': etag },
+        });
+        expect(deleted.status()).toBe(204);
+      }),
+    );
+    const failures = results.filter((result) => result.status === 'rejected');
+    if (failures.length) {
+      const error = new AggregateError(
+        failures.map((failure) => failure.reason),
+        'Cart fixture cleanup failed',
+      );
+      if (completed) throw error;
+      await test
+        .info()
+        .attach('cart fixture cleanup', {
+          body: failures.map((failure) => String(failure.reason)).join('\n'),
+          contentType: 'text/plain',
+        })
+        .catch(() => undefined);
+    }
+  }
 }
 
 async function readStock(page: Page, book: SeedBook) {
@@ -390,126 +439,131 @@ test('recovers the same quote through Keycloak, tracks its fresh submission and 
 }) => {
   await expect(await page.request.get('/api/ready')).toBeOK();
   await signIn(page, 'reader-a');
-  await addBook(page, boundedContexts);
-  const quoteId = await createQuote(page, boundedContexts, 2);
-  const confirmation = '/en/cart?quote=' + quoteId;
-  const posts: { key: string; body: unknown }[] = [];
-  page.on('request', (request) => {
-    if (
-      request.method() === 'POST' &&
-      new URL(request.url()).pathname === submissions
-    )
-      posts.push({
-        key: request.headers()['idempotency-key'],
-        body: request.postDataJSON(),
-      });
-  });
-  await page.route(
-    '**' + submissions,
-    (route) =>
-      route.fulfill({
-        status: 401,
-        json: { error: { code: 'UNAUTHENTICATED', requestId: randomUUID() } },
-      }),
-    { times: 1 },
-  );
-  expect((await place(page)).status()).toBe(401);
-  await expect(page).toHaveURL(
-    (url) =>
-      url.pathname === '/en/cart' &&
-      url.searchParams.get('quote') === quoteId &&
-      url.searchParams.get('notice') === 'signIn',
-  );
-  const main = page.getByRole('main');
-  await expect(main.getByRole('alert')).toHaveText(
-    'Your checkout session ended. Sign in again to continue with this quote.',
-  );
-  for (const path of ['/api/v1/cart', quotes + '/' + quoteId])
-    expect((await page.request.get(path)).status()).toBe(200);
-  const resume = main.getByRole('link', { name: 'Sign in to continue' });
-  await expect(resume).toHaveAttribute(
-    'href',
-    '/api/auth/signin/keycloak?' +
-      new URLSearchParams({ returnTo: confirmation }),
-  );
-  await resume.click();
-  await authenticate(page, 'reader-a');
-  await expect(page).toHaveURL(confirmation);
-  await expect(
-    main.getByRole('heading', { name: 'Confirm quote' }),
-  ).toBeVisible();
-  const attempt = { key: quoteId, body: { quoteId } };
-  expect(posts).toEqual([attempt]);
-
-  const beforeSubmit = Date.now();
-  const tracked = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'GET' &&
-      new URL(response.url()).pathname.startsWith(submissions + '/'),
-  );
-  const [{ initial, response }] = await Promise.all([
-    page
-      .waitForResponse(
-        (response) =>
-          response.request().method() === 'POST' &&
-          new URL(response.url()).pathname === submissions,
+  await withCartCleanup(page.request, [boundedContexts], async () => {
+    await addBook(page, boundedContexts);
+    const quoteId = await createQuote(page, boundedContexts, 2);
+    const confirmation = '/en/cart?quote=' + quoteId;
+    const posts: { key: string; body: unknown }[] = [];
+    page.on('request', (request) => {
+      if (
+        request.method() === 'POST' &&
+        new URL(request.url()).pathname === submissions
       )
-      .then(async (response) => ({ response, initial: await response.json() })),
-    placeButton(page).click(),
-  ]);
-  expect(posts).toEqual([attempt, attempt]);
-  expect(response.status()).toBe(202);
-  const submissionId = accepted(response);
-  expect(initial).toEqual({ submissionId, state: 'PROCESSING' });
-  const submissionPath = submissions + '/' + submissionId;
-  const poll = await tracked;
-  expect(new URL(poll.url()).pathname).toBe(submissionPath);
-  expect(poll.status()).toBe(200);
-  const orderId = await receiptId(page);
-  expect(await read<Submission>(page.request, submissionPath)).toMatchObject({
-    state: 'PLACED',
-    order: { orderId },
-  });
-  const orderPath = orders + '/' + orderId;
-  const order = await read<Order>(page.request, orderPath);
-  expect(order).toMatchObject({
-    id: orderId,
-    currency: 'CNY',
-    totalMinor: 9800,
-    lines: [orderLine(boundedContexts, 2)],
-  });
-  assert(
-    order.createdAt,
-    'A newly placed order must have a creation timestamp',
-  );
-  const createdAt = Date.parse(order.createdAt);
-  expect(createdAt).toBeGreaterThanOrEqual(beforeSubmit - 1_000);
-  expect(createdAt).toBeLessThanOrEqual(Date.now() + 1_000);
+        posts.push({
+          key: request.headers()['idempotency-key'],
+          body: request.postDataJSON(),
+        });
+    });
+    await page.route(
+      '**' + submissions,
+      (route) =>
+        route.fulfill({
+          status: 401,
+          json: { error: { code: 'UNAUTHENTICATED', requestId: randomUUID() } },
+        }),
+      { times: 1 },
+    );
+    expect((await place(page)).status()).toBe(401);
+    await expect(page).toHaveURL(
+      (url) =>
+        url.pathname === '/en/cart' &&
+        url.searchParams.get('quote') === quoteId &&
+        url.searchParams.get('notice') === 'signIn',
+    );
+    const main = page.getByRole('main');
+    await expect(main.getByRole('alert')).toHaveText(
+      'Your checkout session ended. Sign in again to continue with this quote.',
+    );
+    for (const path of ['/api/v1/cart', quotes + '/' + quoteId])
+      expect((await page.request.get(path)).status()).toBe(200);
+    const resume = main.getByRole('link', { name: 'Sign in to continue' });
+    await expect(resume).toHaveAttribute(
+      'href',
+      '/api/auth/signin/keycloak?' +
+        new URLSearchParams({ returnTo: confirmation }),
+    );
+    await resume.click();
+    await authenticate(page, 'reader-a', 'reauthenticate');
+    await expect(page).toHaveURL(confirmation);
+    await expect(
+      main.getByRole('heading', { name: 'Confirm quote' }),
+    ).toBeVisible();
+    const attempt = { key: quoteId, body: { quoteId } };
+    expect(posts).toEqual([attempt]);
 
-  const nav = page.getByRole('navigation', { name: 'Main navigation' });
-  await nav.locator('summary').filter({ hasText: 'My account' }).click();
-  await nav.getByRole('link', { name: 'Orders', exact: true }).click();
-  await expect(page).toHaveURL('/en/orders');
-  await page.reload();
-  const receipt = page.getByRole('listitem').filter({
-    has: page.getByRole('heading', { name: 'Order ' + orderId, exact: true }),
+    const beforeSubmit = Date.now();
+    const tracked = page.waitForResponse(
+      (response) =>
+        response.request().method() === 'GET' &&
+        new URL(response.url()).pathname.startsWith(submissions + '/'),
+    );
+    const [{ initial, response }] = await Promise.all([
+      page
+        .waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === submissions,
+        )
+        .then(async (response) => ({
+          response,
+          initial: await response.json(),
+        })),
+      placeButton(page).click(),
+    ]);
+    expect(posts).toEqual([attempt, attempt]);
+    expect(response.status()).toBe(202);
+    const submissionId = accepted(response);
+    expect(initial).toEqual({ submissionId, state: 'PROCESSING' });
+    const submissionPath = submissions + '/' + submissionId;
+    const poll = await tracked;
+    expect(new URL(poll.url()).pathname).toBe(submissionPath);
+    expect(poll.status()).toBe(200);
+    const orderId = await receiptId(page);
+    expect(await read<Submission>(page.request, submissionPath)).toMatchObject({
+      state: 'PLACED',
+      order: { orderId },
+    });
+    const orderPath = orders + '/' + orderId;
+    const order = await read<Order>(page.request, orderPath);
+    expect(order).toMatchObject({
+      id: orderId,
+      currency: 'CNY',
+      totalMinor: 9800,
+      lines: [orderLine(boundedContexts, 2)],
+    });
+    assert(
+      order.createdAt,
+      'A newly placed order must have a creation timestamp',
+    );
+    const createdAt = Date.parse(order.createdAt);
+    expect(createdAt).toBeGreaterThanOrEqual(beforeSubmit - 1_000);
+    expect(createdAt).toBeLessThanOrEqual(Date.now() + 1_000);
+
+    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    await nav.locator('summary').filter({ hasText: 'My account' }).click();
+    await nav.getByRole('link', { name: 'Orders', exact: true }).click();
+    await expect(page).toHaveURL('/en/orders');
+    await page.reload();
+    const receipt = page.getByRole('listitem').filter({
+      has: page.getByRole('heading', { name: 'Order ' + orderId, exact: true }),
+    });
+    await expect(receipt).toHaveCount(1);
+    await expect(
+      receipt.getByRole('link', { name: boundedContexts.title, exact: true }),
+    ).toBeVisible();
+    await expect(
+      receipt.getByText('2 × ' + money(4900), { exact: true }),
+    ).toBeVisible();
+    await expect(receipt.getByText(money(9800), { exact: true })).toBeVisible();
+    await expect(receipt.locator('time')).toHaveAttribute(
+      'datetime',
+      order.createdAt,
+    );
+    await expect(receipt.locator('time')).toHaveText(
+      placedDate.format(createdAt),
+    );
+    expect(await read<Order>(page.request, orderPath)).toEqual(order);
   });
-  await expect(receipt).toHaveCount(1);
-  await expect(
-    receipt.getByRole('link', { name: boundedContexts.title, exact: true }),
-  ).toBeVisible();
-  await expect(
-    receipt.getByText('2 × ' + money(4900), { exact: true }),
-  ).toBeVisible();
-  await expect(receipt.getByText(money(9800), { exact: true })).toBeVisible();
-  await expect(receipt.locator('time')).toHaveAttribute(
-    'datetime',
-    order.createdAt,
-  );
-  await expect(receipt.locator('time')).toHaveText(
-    placedDate.format(createdAt),
-  );
-  expect(await read<Order>(page.request, orderPath)).toEqual(order);
 });
 
 test('retries a lost submission response with the same quote and leaves one order and stock decrement', async ({
@@ -596,78 +650,74 @@ test('placing an earlier two-line quote clears only the matching cart revision, 
     return etag;
   }
 
-  for (const book of [boundedContexts, transactions]) {
-    const added = await page.request.put(path(book), {
-      headers: { ...headers, 'If-None-Match': '*' },
-      data: { quantity: 1 },
-    });
-    expect(added.status()).toBe(201);
-  }
-  const original = await itemVersion(boundedContexts, 1);
-  const unchanged = await itemVersion(transactions, 1);
-  await page.goto('/en/cart');
-  await page.getByRole('button', { name: 'Review quote' }).click();
-  await expect(page).toHaveURL(/\/en\/cart\?quote=[a-f0-9-]+$/);
-  const quoteId = new URL(page.url()).searchParams.get('quote')!;
-  const quote = await read<Quote>(page.request, quotes + '/' + quoteId);
-  const expectedLines = [
-    orderLine(boundedContexts, 1),
-    orderLine(transactions, 1),
-  ];
-  expect(quote.lines).toHaveLength(2);
-  expect(quote.lines).toEqual(expect.arrayContaining(expectedLines));
+  await withCartCleanup(
+    page.request,
+    [boundedContexts, transactions],
+    async () => {
+      for (const book of [boundedContexts, transactions]) {
+        const added = await page.request.put(path(book), {
+          headers: { ...headers, 'If-None-Match': '*' },
+          data: { quantity: 1 },
+        });
+        expect(added.status()).toBe(201);
+      }
+      const original = await itemVersion(boundedContexts, 1);
+      const unchanged = await itemVersion(transactions, 1);
+      await page.goto('/en/cart');
+      await page.getByRole('button', { name: 'Review quote' }).click();
+      await expect(page).toHaveURL(/\/en\/cart\?quote=[a-f0-9-]+$/);
+      const quoteId = new URL(page.url()).searchParams.get('quote')!;
+      const quote = await read<Quote>(page.request, quotes + '/' + quoteId);
+      const expectedLines = [
+        orderLine(boundedContexts, 1),
+        orderLine(transactions, 1),
+      ];
+      expect(quote.lines).toHaveLength(2);
+      expect(quote.lines).toEqual(expect.arrayContaining(expectedLines));
 
-  const edited = await page.request.put(path(boundedContexts), {
-    headers: { ...headers, 'If-Match': original },
-    data: { quantity: 2 },
-  });
-  expect(edited.status()).toBe(200);
-  const revised = await itemVersion(boundedContexts, 2);
-  try {
-    expect(revised).not.toBe(original);
-    expect(await itemVersion(transactions, 1)).toBe(unchanged);
-    const initial = await place(page);
-    const submissionId = accepted(initial);
-    expect(initial.request().headers()['idempotency-key']).toBe(quoteId);
-    const orderId = await receiptId(page);
-    const order = await read<Order>(page.request, orders + '/' + orderId);
-    expect(order.lines).toHaveLength(2);
-    expect(order.lines).toEqual(expect.arrayContaining(expectedLines));
-    expect(order.totalMinor).toBe(
-      boundedContexts.priceMinor + transactions.priceMinor,
-    );
-    async function checkCleanedCart() {
-      expect((await page.request.get(path(transactions))).status()).toBe(404);
-      expect(await itemVersion(boundedContexts, 2)).toBe(revised);
-    }
-    await checkCleanedCart();
+      const edited = await page.request.put(path(boundedContexts), {
+        headers: { ...headers, 'If-Match': original },
+        data: { quantity: 2 },
+      });
+      expect(edited.status()).toBe(200);
+      const revised = await itemVersion(boundedContexts, 2);
+      expect(revised).not.toBe(original);
+      expect(await itemVersion(transactions, 1)).toBe(unchanged);
+      const initial = await place(page);
+      const submissionId = accepted(initial);
+      expect(initial.request().headers()['idempotency-key']).toBe(quoteId);
+      const orderId = await receiptId(page);
+      const order = await read<Order>(page.request, orders + '/' + orderId);
+      expect(order.lines).toHaveLength(2);
+      expect(order.lines).toEqual(expect.arrayContaining(expectedLines));
+      expect(order.totalMinor).toBe(
+        boundedContexts.priceMinor + transactions.priceMinor,
+      );
+      async function checkCleanedCart() {
+        expect((await page.request.get(path(transactions))).status()).toBe(404);
+        expect(await itemVersion(boundedContexts, 2)).toBe(revised);
+      }
+      await checkCleanedCart();
 
-    const replay = await page.request.post(submissions, {
-      headers: { ...headers, 'Idempotency-Key': quoteId },
-      data: { quoteId },
-    });
-    expect(replay.status()).toBe(200);
-    expect(replay.headers().location).toBe(submissions + '/' + submissionId);
-    expect(await replay.json()).toMatchObject({
-      submissionId,
-      state: 'PLACED',
-      order: { orderId },
-    });
-    await checkCleanedCart();
-    expect(
-      (await orderHistory(page))
-        .filter((entry) => !before.has(entry.id))
-        .map((entry) => entry.id),
-    ).toEqual([orderId]);
-  } finally {
-    expect(
-      (
-        await page.request.delete(path(boundedContexts), {
-          headers: { ...headers, 'If-Match': revised },
-        })
-      ).status(),
-    ).toBe(204);
-  }
+      const replay = await page.request.post(submissions, {
+        headers: { ...headers, 'Idempotency-Key': quoteId },
+        data: { quoteId },
+      });
+      expect(replay.status()).toBe(200);
+      expect(replay.headers().location).toBe(submissions + '/' + submissionId);
+      expect(await replay.json()).toMatchObject({
+        submissionId,
+        state: 'PLACED',
+        order: { orderId },
+      });
+      await checkCleanedCart();
+      expect(
+        (await orderHistory(page))
+          .filter((entry) => !before.has(entry.id))
+          .map((entry) => entry.id),
+      ).toEqual([orderId]);
+    },
+  );
 });
 
 test('one signed-in reader gets the last copy and the losing reader keeps their cart', async ({
