@@ -14,7 +14,6 @@ import { assertMutationOrigin } from '@/server/http/origin.server';
 import { apiErrorResponse } from '@/server/http/response.server';
 import { ApiFailure } from '@/shared/api/error';
 
-const loginPath = '/api/auth/signin/keycloak';
 const callbackPath = '/api/auth/oauth2/callback/keycloak';
 const loginLifetimeSeconds = 10 * 60;
 const sessionLifetimeSeconds = 8 * 60 * 60;
@@ -23,6 +22,7 @@ const subjectSchema = z
   .uuid()
   .refine((subject) => subject === subject.toLowerCase());
 
+type AuthFlow = 'signin' | 'register';
 type AuthCookie = 'login' | 'session';
 type JavaSession = { subject: string; accessToken: string };
 type SessionRow = {
@@ -66,8 +66,11 @@ function returnPath(value: string | null): string {
     : fallback;
 }
 
-export function javaLoginHref(returnTo: string): string {
-  return `${loginPath}?${new URLSearchParams({ returnTo: returnPath(returnTo) })}`;
+export function javaAuthHref(
+  returnTo: string,
+  flow: AuthFlow = 'signin',
+): string {
+  return `/api/auth/${flow}/keycloak?${new URLSearchParams({ returnTo: returnPath(returnTo) })}`;
 }
 
 function cookieName(config: ReleaseConfig, kind: AuthCookie): string {
@@ -184,7 +187,10 @@ function accessTokenExpiry(
   return new Date(Date.now() + seconds * 1000);
 }
 
-export async function startJavaLogin(request: NextRequest): Promise<Response> {
+export async function startJavaLogin(
+  request: NextRequest,
+  flow: AuthFlow = 'signin',
+): Promise<Response> {
   try {
     const config = configuredAuth();
     const provider = await oidcConfig(config);
@@ -193,9 +199,12 @@ export async function startJavaLogin(request: NextRequest): Promise<Response> {
     const state = oidc.randomState();
     const nonce = oidc.randomNonce();
     const verifier = oidc.randomPKCECodeVerifier();
+    const returnTo = returnPath(request.nextUrl.searchParams.get('returnTo'));
     const redirect = oidc.buildAuthorizationUrl(provider, {
       redirect_uri: new URL(callbackPath, config.appOrigin).href,
       scope: 'openid email profile',
+      prompt: flow === 'register' ? 'create' : 'login',
+      ui_locales: returnTo.split('/')[1],
       state,
       nonce,
       code_challenge: await oidc.calculatePKCECodeChallenge(verifier),
@@ -203,7 +212,6 @@ export async function startJavaLogin(request: NextRequest): Promise<Response> {
     });
 
     const sql = javaDb(config.authDatabaseUrl);
-    const returnTo = returnPath(request.nextUrl.searchParams.get('returnTo'));
     const expiresAt = new Date(Date.now() + loginLifetimeSeconds * 1000);
     await sql`DELETE FROM bookstore_auth_attempts WHERE expires_at <= now()`;
     await sql`

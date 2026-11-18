@@ -67,7 +67,7 @@ async function OrderHistory({
     if (!(error instanceof ApiFailure)) throw error;
     const href = ordersPath + (page > 1 ? '?page=' + page : '');
     if (error.code === 'UNAUTHENTICATED')
-      return <CheckoutSignIn locale={locale} returnTo={href} />;
+      return <CheckoutSignIn locale={locale} returnTo={href} intent="orders" />;
     return (
       <CatalogNotice
         message={t('notices.unavailable')}

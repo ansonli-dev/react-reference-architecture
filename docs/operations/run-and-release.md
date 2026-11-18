@@ -35,7 +35,7 @@
 
 本地联调可用 Java 仓库的 `demo/compose.yaml` 和 `demo/compose.frontend.yaml` 启动完整环境。后端 `demo/README.md` 记录启动步骤。[Java OpenAPI 契约](../../contracts/java/README.md)
 
-在独立的 BFF PostgreSQL 数据库执行 [会话建表](../../database/auth.sql) 和 [购物车建表](../../database/cart.sql)。配置 Java Catalog 和 Order 服务的地址以及 Keycloak 客户端，再用同一个发布构建执行 `pnpm start`。访问 `/zh-CN/books` 或 `/en/books`，登录后可从详情加购，核对人民币报价，提交订单并重新打开订单列表。
+在独立的 BFF PostgreSQL 数据库执行 [会话建表](../../database/auth.sql) 和 [购物车建表](../../database/cart.sql)。配置 Java Catalog 和 Order 服务的地址以及 Keycloak 客户端，再用同一个发布构建执行 `pnpm start`。访问 `/zh-CN/books` 或 `/en/books`，点击注册或登录。验证邮箱并登录后，可从详情加购，核对人民币报价，提交订单并重新打开订单列表。
 
 | 环境变量                 | 用途                                                                |
 | ------------------------ | ------------------------------------------------------------------- |
@@ -49,6 +49,8 @@
 | `OIDC_CLIENT_SECRET`     | BFF 客户端凭据。                                                    |
 
 Keycloak 客户端需注册 `APP_ORIGIN/api/auth/oauth2/callback/keycloak`，并向 Order 服务发放所需受众及已验证邮箱声明。前端 origin 和公开 issuer 在回环联调外使用 HTTPS。会话 Cookie 随浏览器请求发送给 BFF。Java 访问令牌留在服务端，BFF 仅在调用用户自己的 Order 接口时添加 Bearer 凭据。发布模式下未登录的私有 BFF 请求返回 401，私有资源使用 `Cache-Control: no-store`。
+
+在 Keycloak realm 开启 User registration、Verify email 和 Forgot password，将 `bookstore-reader` 加入默认角色，并配置可投递验证和重置邮件的 SMTP。Java 仓库的 Compose 会挂载 `bookstore` 登录主题。部署到独立 Keycloak 时，安装同一主题，并将 BFF 客户端的 Home URL 设为书店根地址。Compose 联调环境的邮件可在 [本地收件箱](http://localhost:8025) 查看。
 
 ## 固定 Linux 验证环境
 

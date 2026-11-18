@@ -17,7 +17,7 @@ pnpm dev:mock
 
 ## Java 集成
 
-发布构建接入真实的 Java v1 目录和订单 API。读者通过 Keycloak 登录，BFF 在 PostgreSQL 中保存账户的购物车草稿。配置和启动方式见 [Java 集成手册](docs/operations/run-and-release.md#java-集成)。
+发布构建接入真实的 Java v1 目录和订单 API。书店账号页支持登录、自助注册和邮件找回密码，登录后回到发起页面。购物车和订单在登录后可见，BFF 在 PostgreSQL 中按账户保存购物车草稿。配置和启动方式见 [Java 集成手册](docs/operations/run-and-release.md#java-集成)。
 
 ![页间书店目录](docs/screenshots/catalog.png)
 

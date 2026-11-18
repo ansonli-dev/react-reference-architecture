@@ -41,15 +41,24 @@ test('serves the correct profile from a live production server', async ({
   const list = await request.get('/en/books');
   expect(list.status()).toBe(200);
   const html = await list.text();
-  expect(html).toContain('href="/en/cart"');
-  expect(html).toContain('href="/en/orders"');
 
   if (info.project.name === 'release') {
-    for (const path of ['/en/cart', '/en/orders']) {
+    expect(html).toContain('href="/api/auth/signin/keycloak?');
+    expect(html).not.toContain('href="/api/auth/register/keycloak?');
+    expect(html).not.toContain('href="/en/cart"');
+    expect(html).not.toContain('href="/en/orders"');
+    for (const [path, prompt] of [
+      ['/en/cart', 'Sign in to view your saved cart.'],
+      ['/en/orders', 'Sign in to view your order history.'],
+    ]) {
       const page = await request.get(path);
       expect(page.status()).toBe(200);
-      expect(await page.text()).toContain(
-        'Sign in to use your cart and orders.',
+      const checkout = await page.text();
+      expect(checkout).toContain(prompt);
+      expect(checkout).toContain(
+        'href="/api/auth/register/keycloak?returnTo=' +
+          encodeURIComponent(path) +
+          '"',
       );
     }
     for (const path of ['/api/v1/cart', '/api/v1/orders']) {
@@ -65,6 +74,10 @@ test('serves the correct profile from a live production server', async ({
     });
     expect(entry.status()).toBe(404);
     expect(entry.headers()['set-cookie']).toBeUndefined();
+  } else {
+    expect(html).toContain('href="/en/cart"');
+    expect(html).toContain('href="/en/orders"');
+    expect(html).not.toContain('href="/api/auth/register/keycloak?');
   }
 });
 
