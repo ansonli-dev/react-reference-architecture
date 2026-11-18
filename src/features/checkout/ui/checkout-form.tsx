@@ -2,26 +2,19 @@
 
 import type { ReactNode } from 'react';
 import {
-  cartQuantityValue,
-  checkoutErrorCodes,
-  checkoutNoticeSchema,
-  shopperIdSchema,
-  submissionSchema,
-  type CheckoutNotice,
-  type Currency,
-} from '../model';
+  CheckoutFailure,
+  checkoutRequestOptions,
+  createQuote,
+  getSubmission,
+  submitQuote,
+} from '../api';
+import { cartQuantityValue, type Currency } from '../model';
 
 type Operation =
   | { type: 'add'; bookId: string }
   | { type: 'update' | 'remove'; bookId: string; etag: string }
   | { type: 'quote'; currency: Currency; revision: string }
   | { type: 'submit'; quoteId: string; ordersPath: string };
-
-class CheckoutFailure extends Error {
-  constructor(readonly notice: CheckoutNotice) {
-    super(notice);
-  }
-}
 
 async function request(
   path: string,
@@ -30,19 +23,11 @@ async function request(
 ) {
   const response = await fetch(path, {
     ...init,
-    cache: 'no-store',
-    signal: AbortSignal.timeout(8000),
+    ...checkoutRequestOptions(),
   });
   if (!response.ok && response.status !== allowedStatus) {
     const payload = await response.json().catch(() => null);
-    const entry = Object.entries(checkoutErrorCodes).find(
-      ([, code]) => code === payload?.error?.code,
-    );
-    const notice =
-      entry?.[0] === 'precondition'
-        ? 'changed'
-        : checkoutNoticeSchema.safeParse(entry?.[0]).data;
-    throw new CheckoutFailure(notice ?? 'unavailable');
+    throw CheckoutFailure.fromPayload(payload);
   }
   return response;
 }
@@ -85,41 +70,16 @@ async function addToCart(bookId: string) {
   throw new CheckoutFailure('changed');
 }
 
-function post(path: string, body: object, key?: string) {
-  return request(path, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(key && { 'Idempotency-Key': key }),
-    },
-    body: JSON.stringify(body),
-  });
-}
-
 async function submitOrder(quoteId: string) {
-  // One submission is allowed per quote. The quote ID makes retries stable across refreshes.
-  const response = await post(
-    '/api/v1/order-submissions',
-    { quoteId },
-    quoteId,
-  );
-  let submission = submissionSchema.parse(await response.json());
+  let submission = await submitQuote(quoteId);
   const id = submission.submissionId;
-  const statusPath = '/api/v1/order-submissions/' + id;
-  const location = response.headers.get('Location');
-  if (location && location !== statusPath)
-    throw new CheckoutFailure('unavailable');
   for (
     let attempt = 0;
     attempt < 6 && submission.state === 'PROCESSING';
     attempt++
   ) {
     await new Promise((resolve) => window.setTimeout(resolve, 650));
-    submission = submissionSchema.parse(
-      await (await request(statusPath)).json(),
-    );
-    if (submission.submissionId !== id)
-      throw new CheckoutFailure('unavailable');
+    submission = await getSubmission(id);
   }
   if (submission.state === 'PLACED') return submission.order.orderId;
   if (submission.state === 'PROCESSING')
@@ -162,14 +122,7 @@ async function checkoutPath(
       });
       return cartPath;
     case 'quote': {
-      const response = await post('/api/v1/order-quotes', {
-        currency: operation.currency,
-        cartRevision: operation.revision,
-      });
-      const { quoteId } = await response.json();
-      const id = shopperIdSchema.parse(quoteId);
-      if (response.headers.get('Location') !== '/api/v1/order-quotes/' + id)
-        throw new CheckoutFailure('unavailable');
+      const id = await createQuote(operation.currency, operation.revision);
       return cartPath + '?quote=' + id;
     }
     case 'submit': {
