@@ -47,6 +47,18 @@ function quoteFor(
   return quote;
 }
 
+function expireQuote(quoteId: string) {
+  const db = new DatabaseSync(join(dir, 'demo.sqlite'));
+  try {
+    db.prepare('UPDATE demo_order_quotes SET expires_at = ? WHERE id = ?').run(
+      '2000-01-01T00:00:00.000Z',
+      quoteId,
+    );
+  } finally {
+    db.close();
+  }
+}
+
 it('upgrades an existing catalog while preserving locally edited metadata and stock', async () => {
   const db = new DatabaseSync(join(dir, 'demo.sqlite'));
   try {
@@ -82,7 +94,7 @@ it('upgrades an existing catalog while preserving locally edited metadata and st
   expect(await catalog.get(firstBook)).toMatchObject({ stock: 2 });
 });
 
-it('creates one receipt and deducts stock once on replay, while keeping other currencies and shoppers separate', async () => {
+it('creates one receipt and deducts stock once on replay after quote expiry, while keeping other currencies and shoppers separate', async () => {
   seed();
   const { shop, catalog } = openShop();
   expect(shop.setCartItem(buyer, firstBook, 1)).toMatchObject({
@@ -103,6 +115,7 @@ it('creates one receipt and deducts stock once on replay, while keeping other cu
   expect(result).toMatchObject({ created: true, bookIds: [firstBook] });
   const { orderId } = result.submission.order;
   expect(shop.cart(buyer)).toEqual([usd]);
+  expireQuote(quote.quoteId);
   const reopened = openShop().shop;
   expect(reopened.submitQuote(buyer, quote.quoteId, quote.quoteId)).toEqual({
     submission: result.submission,
@@ -196,15 +209,7 @@ it('rejects an expired quote without modifying the cart or stock', async () => {
     created: true,
   });
   const quote = quoteFor(shop, buyer, shop.cart(buyer)[0]);
-  const db = new DatabaseSync(join(dir, 'demo.sqlite'));
-  try {
-    db.prepare('UPDATE demo_order_quotes SET expires_at = ? WHERE id = ?').run(
-      '2000-01-01T00:00:00.000Z',
-      quote.quoteId,
-    );
-  } finally {
-    db.close();
-  }
+  expireQuote(quote.quoteId);
   expect(shop.submitQuote(buyer, quote.quoteId, quote.quoteId)).toEqual({
     error: 'expired',
   });

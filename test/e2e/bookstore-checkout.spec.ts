@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
 const checkoutBookId = '00000000-0000-4000-8000-000000000103';
 const checkoutTitle = '边界与依赖';
@@ -295,4 +295,178 @@ test('shops from the bilingual storefront, changes quantity, places an order and
   } finally {
     await guest.close();
   }
+});
+
+const recoveryBook = '00000000-0000-4000-8000-000000000108';
+const submissions = '/api/v1/order-submissions';
+
+async function reviewRecoveryQuote(page: Page) {
+  await page.goto('/en/books/' + recoveryBook);
+  await page.getByRole('button', { name: 'Add to cart' }).click();
+  await page.getByRole('button', { name: 'Review quote' }).click();
+  await expect(page).toHaveURL(/\/en\/cart\?quote=[a-f0-9-]+$/);
+  return new URL(page.url()).searchParams.get('quote')!;
+}
+
+for (const scenario of [
+  {
+    state: 'PROCESSING',
+    polls: 6,
+    notice: 'processing',
+    message:
+      'Your order is processing. Submit the same quote to check its status.',
+  },
+  {
+    state: 'RECONCILE_REQUIRED',
+    polls: 0,
+    notice: 'reconcile',
+    message:
+      'Your order is under review. Submit the same quote to check its status.',
+  },
+]) {
+  test(
+    'retains the quote for manual retry after ' + scenario.state,
+    async ({ page }, info) => {
+      test.skip(!['demo', 'dev'].includes(info.project.name));
+      const quoteId = await reviewRecoveryQuote(page);
+      const submissionId = crypto.randomUUID();
+      const statusPath = submissions + '/' + submissionId;
+      const attempts: { key: string; body: unknown }[] = [];
+      const polls: string[] = [];
+      await page.route('**' + submissions, (route) => {
+        const request = route.request();
+        attempts.push({
+          key: request.headers()['idempotency-key'],
+          body: request.postDataJSON(),
+        });
+        return route.fulfill({
+          status: 202,
+          headers: { Location: statusPath },
+          json: { submissionId, state: scenario.state },
+        });
+      });
+      await page.route('**' + submissions + '/*', (route) => {
+        polls.push(
+          route.request().method() +
+            ' ' +
+            new URL(route.request().url()).pathname,
+        );
+        return route.fulfill({
+          status: 200,
+          json: { submissionId, state: scenario.state },
+        });
+      });
+      const place = page.getByRole('button', { name: 'Place demo order' });
+      await place.click();
+      await expect(page).toHaveURL(
+        (url) =>
+          url.pathname === '/en/cart' &&
+          url.searchParams.get('quote') === quoteId &&
+          url.searchParams.get('notice') === scenario.notice,
+        { timeout: 15_000 },
+      );
+      await expect(page.getByRole('main').getByRole('alert')).toHaveText(
+        scenario.message,
+      );
+      expect(polls).toEqual(Array(scenario.polls).fill('GET ' + statusPath));
+      const attempt = { key: quoteId, body: { quoteId } };
+      expect(attempts).toEqual([attempt]);
+      await Promise.all([
+        page.waitForResponse(
+          (response) =>
+            response.request().method() === 'POST' &&
+            new URL(response.url()).pathname === submissions,
+        ),
+        place.click(),
+      ]);
+      expect(attempts).toEqual([attempt, attempt]);
+    },
+  );
+}
+
+test('replays a lost Demo response and charges stock for exactly one order', async ({
+  page,
+}, info) => {
+  test.skip(!['demo', 'dev'].includes(info.project.name));
+  const quoteId = await reviewRecoveryQuote(page);
+  const bookPath = '/api/v1/catalog/books/' + recoveryBook;
+  async function stock() {
+    const response = await page.request.get(bookPath);
+    expect(response.status()).toBe(200);
+    return (await response.json()).stock as number;
+  }
+  const initialStock = await stock();
+  const lost = Promise.withResolvers<{
+    status: number;
+    key: string;
+    body: unknown;
+    submission: {
+      state: string;
+      submissionId: string;
+      order: { orderId: string };
+    };
+  }>();
+  await page.route(
+    '**' + submissions,
+    async (route) => {
+      const request = route.request();
+      const response = await route.fetch();
+      lost.resolve({
+        status: response.status(),
+        key: request.headers()['idempotency-key'],
+        body: request.postDataJSON(),
+        submission: await response.json(),
+      });
+      await route.abort('failed');
+    },
+    { times: 1 },
+  );
+  const place = page.getByRole('button', { name: 'Place demo order' });
+  await place.click();
+  const first = await lost.promise;
+  expect(first).toMatchObject({
+    status: 201,
+    key: quoteId,
+    body: { quoteId },
+    submission: {
+      state: 'PLACED',
+      submissionId: expect.any(String),
+      order: { orderId: expect.any(String) },
+    },
+  });
+  await expect(page.getByRole('main').getByRole('alert')).toContainText(
+    'The bookstore is temporarily unavailable. Try again.',
+  );
+  await expect(page).toHaveURL(
+    (url) => url.searchParams.get('quote') === quoteId,
+  );
+  expect(await stock()).toBe(initialStock - 1);
+  await page.reload();
+  const [replay] = await Promise.all([
+    page.waitForResponse(
+      (response) =>
+        response.request().method() === 'POST' &&
+        new URL(response.url()).pathname === submissions,
+    ),
+    place.click(),
+  ]);
+  expect(replay.request().headers()['idempotency-key']).toBe(first.key);
+  expect(replay.request().postDataJSON()).toEqual(first.body);
+  expect(replay.status()).toBe(200);
+  const statusPath = submissions + '/' + first.submission.submissionId;
+  expect(replay.headers().location).toBe(statusPath);
+  const status = await page.request.get(statusPath);
+  expect(status.status()).toBe(200);
+  expect(await status.json()).toEqual(first.submission);
+  const { orderId } = first.submission.order;
+  await expect(page).toHaveURL('/en/orders?placed=' + orderId);
+  await expect(
+    page.getByRole('heading', { name: 'Order ' + orderId }),
+  ).toBeVisible();
+  const history = await page.request.get('/api/v1/orders');
+  expect(history.status()).toBe(200);
+  expect((await history.json()).orders).toMatchObject([
+    { id: orderId, lines: [{ bookId: recoveryBook, quantity: 1 }] },
+  ]);
+  expect(await stock()).toBe(initialStock - 1);
 });
