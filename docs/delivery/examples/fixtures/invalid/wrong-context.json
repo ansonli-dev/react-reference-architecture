@@ -1,0 +1,6 @@
+{
+  "operation": "deploy",
+  "environment": "test",
+  "context": "other",
+  "namespace": "rra-test"
+}

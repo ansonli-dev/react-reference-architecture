@@ -1,0 +1,35 @@
+{
+  "operation": "deploy",
+  "environment": "test",
+  "context": "docker-desktop",
+  "namespace": "rra-test",
+  "binding": {
+    "schema_version": 1,
+    "repository": "ansonli-dev/react-reference-architecture",
+    "context": "docker-desktop",
+    "authorization_id": null,
+    "api_server": null,
+    "cluster_uid": null,
+    "namespaces": {
+      "develop": {
+        "name": "rra-develop",
+        "uid": null
+      },
+      "test": {
+        "name": "rra-test",
+        "uid": null
+      },
+      "prod": {
+        "name": "rra-prod",
+        "uid": null
+      }
+    },
+    "registry": null,
+    "runner_admission": {
+      "status": "blocked",
+      "policy_id": null,
+      "verified_at": null,
+      "expires_at": null
+    }
+  }
+}

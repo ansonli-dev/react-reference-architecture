@@ -1,0 +1,5 @@
+{
+  "kind": "ConfigMap",
+  "name": "bookstore-runtime-v1",
+  "version": "v1"
+}
