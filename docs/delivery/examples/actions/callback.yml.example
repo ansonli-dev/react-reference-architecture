@@ -1,0 +1,19 @@
+name: Deployment callback preview
+on:
+  workflow_run:
+    workflows: [Develop deployment preview, Test candidate preview, Local prod promotion preview]
+    types: [completed]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  verify-and-deliver:
+    if: ${{ false }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check the observation and replay contract offline
+        run: node --test docs/delivery/examples/tests/callback.test.mjs

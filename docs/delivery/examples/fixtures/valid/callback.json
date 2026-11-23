@@ -1,0 +1,30 @@
+{
+  "schema_version": 1,
+  "repository": "ansonli-dev/react-reference-architecture",
+  "workflow_id": 42,
+  "workflow_path": ".github/workflows/test.yml",
+  "workflow_sha": "7777777777777777777777777777777777777777",
+  "run_id": 200,
+  "run_attempt": 1,
+  "environment": "test",
+  "namespace": "rra-test",
+  "candidate_id": "00000000-0000-4000-8000-000000000001",
+  "revision": 1,
+  "issue_id": "00000000-0000-4000-8000-000000000002",
+  "source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "test_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "prod_sha": null,
+  "deployed_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "manifest_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "config_refs": [
+    {
+      "kind": "ConfigMap",
+      "name": "bookstore-runtime-v1",
+      "version": "v1"
+    }
+  ],
+  "conclusion": "success",
+  "expected_step": "test_deployment",
+  "step_round": 1,
+  "evidence_id": "test-receipt"
+}
