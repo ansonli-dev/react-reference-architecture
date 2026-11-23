@@ -2,13 +2,19 @@ import {
   DeliveryError,
   fingerprint,
   itemsHash,
+  requireCurrentQa,
   requireThat,
   same,
   validateCandidate,
-  validateSignoff,
 } from './contracts.mjs';
 import { checkExecution } from './guard.mjs';
-import { planLockTransition, replaceLock, requireIntent } from './lock.mjs';
+import {
+  planLockTransition,
+  replaceLock,
+  requireCoordinator,
+  requireCurrentGrant,
+  requireIntent,
+} from './lock.mjs';
 
 const plans = new WeakMap();
 
@@ -69,17 +75,7 @@ export function validatePromotion(candidate, signoff, state, now) {
     'SCOPE_MISMATCH',
   );
   if (prod) {
-    requireThat(
-      signoff &&
-        same(state.signoff, signoff) &&
-        state.authorized_qa?.includes(signoff.principal),
-      'QA_AUTHORITY_UNVERIFIED',
-    );
-    validateSignoff(signoff, candidate, now);
-    requireThat(
-      same(state.test_evidence, candidate.test_deployment),
-      'TEST_DEPLOYMENT_MISMATCH',
-    );
+    requireCurrentQa(candidate, signoff, state, now);
   } else {
     requireThat(
       same(state.develop_evidence, {
@@ -169,6 +165,12 @@ export async function executePromotion(plan, deps) {
       'NAMESPACE_UID_MISMATCH',
     );
     const actor = proof.actor;
+    const recheckCoordinator = async () => {
+      const current = await deps.readControl();
+      requireCoordinator(actor, current);
+      if (prod) requireCurrentGrant(lock, current.grant, now());
+      return current;
+    };
 
     const cas = async (request, evidence = proof) => {
       const replacement = planLockTransition(
@@ -207,18 +209,9 @@ export async function executePromotion(plan, deps) {
       kind: 'record_intent',
       operation: makeIntent('merge', plan.source, null, 'coordinator'),
     });
-    await revalidate();
-    proof = await deps.readControl();
-    requireThat(
-      same(proof.actor, actor) &&
-        proof.workflow_allowed === true &&
-        (!prod ||
-          (proof.grant &&
-            fingerprint(proof.grant) === lock.grant.digest &&
-            Date.parse(proof.grant.expires_at) > now())),
-      'HANDOFF_AUTHORITY_UNVERIFIED',
-    );
+    proof = await recheckCoordinator();
     requireIntent(await deps.readLock(), lock);
+    await revalidate();
 
     // The provider protects head; effective writer exclusion and the intent protect the target.
     result.merged = null;
@@ -261,22 +254,23 @@ export async function executePromotion(plan, deps) {
     });
 
     // Re-read the guards before handing the deployment intent to the separate writer.
-    const latest = await deps.readTrustedState();
-    requireRules(latest.rules, plan.environment);
-    requireThat(
-      latest.rules.approved_digest === plan.rules_digest,
-      'TARGET_GUARD_UNAVAILABLE',
-    );
-    if (prod) {
+    const recheckDeployment = async () => {
+      const latest = await deps.readTrustedState();
+      requireRules(latest.rules, plan.environment);
       requireThat(
-        same(latest.signoff, signoff) &&
-          latest.authorized_qa?.includes(signoff.principal),
-        'QA_AUTHORITY_UNVERIFIED',
+        same(latest.refs, { source: plan.source, target: commit.sha }),
+        'POST_MERGE_REF_CHANGED',
       );
-      validateSignoff(signoff, candidate, now());
-    }
+      requireThat(
+        latest.rules.approved_digest === plan.rules_digest,
+        'TARGET_GUARD_UNAVAILABLE',
+      );
+      if (prod) requireCurrentQa(candidate, signoff, latest, now());
+    };
+    await recheckDeployment();
     await cas({
       kind: 'record_intent',
+      candidate: release,
       operation: makeIntent(
         'deploy',
         commit.sha,
@@ -289,6 +283,8 @@ export async function executePromotion(plan, deps) {
       'POST_MERGE_REF_CHANGED',
     );
     requireIntent(await deps.readLock(), lock);
+    proof = await recheckCoordinator();
+    await recheckDeployment();
     result.deployed = null;
     const deployed = await deps.deploy(release, structuredClone(lock));
     const versions = deployed?.evidence;
@@ -304,7 +300,11 @@ export async function executePromotion(plan, deps) {
       'DEPLOYMENT_NOT_VERIFIED',
     );
     result.deployed = true;
-    const evidence_id = fingerprint(versions);
+    const evidence_id = fingerprint({
+      actor,
+      operation_id: lock.operation.id,
+      versions,
+    });
     await finish('succeeded', {
       sha: commit.sha,
       tree: commit.tree,

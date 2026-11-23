@@ -220,13 +220,77 @@ function transfer(lock, request, evidence, now) {
     recovery_from: null,
     grant: {
       id: grant.id,
+      kind: grant.kind,
       digest: fingerprint(grant),
       predecessor: lock.holder,
     },
   };
 }
 
-function stageIntent(lock, operation) {
+function successfulMerge(lock, target) {
+  return lock.results.find(
+    (op) =>
+      op.kind === 'merge' && op.target === target && op.status === 'succeeded',
+  );
+}
+
+export function requireDeploymentMerge(lock, operation, candidate) {
+  assertCandidate(lock, candidate);
+  const prod = operation.target === 'prod';
+  const merge = successfulMerge(lock, operation.target);
+  const sha = prod ? candidate.prod_merge_sha : candidate.test_sha;
+  const tree = prod ? candidate.prod_merge_tree : candidate.test_tree;
+  requireThat(
+    sha &&
+      tree &&
+      operation.sha === sha &&
+      operation.digest === candidate.manifest_digest &&
+      merge?.sha === (prod ? candidate.test_sha : candidate.source_sha) &&
+      merge.result?.sha === sha &&
+      merge.result.tree === tree,
+    'MERGE_RECEIPT_MISMATCH',
+  );
+}
+
+export function recoveryIntentDigest(lock, operation) {
+  return fingerprint({
+    lock_uid: lock.uid,
+    namespace_uid: lock.namespace_uid,
+    generation: lock.generation,
+    holder: lock.holder,
+    subject: lock.subject,
+    grant: lock.grant,
+    operation,
+    merge: successfulMerge(lock, operation.target)?.result ?? null,
+  });
+}
+
+export function requireRecoveryApproval(lock, operation, approval, now) {
+  if (lock.grant?.kind !== 'recover') return;
+  requireThat(
+    approval?.intent_digest === recoveryIntentDigest(lock, operation),
+    'RECOVERY_APPROVAL_UNVERIFIED',
+  );
+  requireCurrent(approval, now, 'RECOVERY_APPROVAL_UNVERIFIED');
+}
+
+export function requireCurrentGrant(lock, grant, now) {
+  requireThat(
+    lock.grant &&
+      grant &&
+      grant.id === lock.grant.id &&
+      grant.kind === lock.grant.kind &&
+      grant.lock_uid === lock.uid &&
+      grant.namespace_uid === lock.namespace_uid &&
+      grant.expected_generation + 1 === lock.generation &&
+      same(grant.successor, lock.holder) &&
+      fingerprint(grant) === lock.grant.digest,
+    'HANDOFF_AUTHORITY_UNVERIFIED',
+  );
+  requireCurrent(grant, now, 'HANDOFF_AUTHORITY_UNVERIFIED');
+}
+
+function stageIntent(lock, operation, candidate, evidence, now) {
   requireThat(!lock.operation, 'OPERATION_IN_FLIGHT');
   const target = { test_active: 'test', prod_active: 'prod' }[lock.phase];
   const bootstrap = lock.phase === 'bootstrap_active';
@@ -259,6 +323,9 @@ function stageIntent(lock, operation) {
     ),
     'OPERATION_ALREADY_APPLIED',
   );
+  if (operation.kind === 'deploy')
+    requireDeploymentMerge(lock, operation, candidate);
+  requireRecoveryApproval(lock, operation, evidence.recovery_approval, now);
   return { ...lock, operation };
 }
 
@@ -291,7 +358,13 @@ function finishDeployment(lock, candidate, environment) {
         op.result.evidence_id === candidate.test_deployment?.evidence_id),
   );
   requireThat(
-    subject.test_digest && sha && merge && deploy,
+    subject.test_digest &&
+      sha &&
+      merge &&
+      deploy &&
+      (environment === 'prod' ||
+        (candidate.test_deployment.run_id === lock.holder.run_id &&
+          candidate.test_deployment.run_attempt === lock.holder.run_attempt)),
     'DEPLOYMENT_NOT_VERIFIED',
   );
   return {
@@ -367,7 +440,7 @@ function transition(lock, request, evidence, now) {
   );
   switch (kind) {
     case 'record_intent':
-      return stageIntent(lock, request.operation);
+      return stageIntent(lock, request.operation, candidate, evidence, now);
     case 'complete_intent': {
       requireThat(lock.phase !== 'recovery_required', 'LOCK_PHASE_MISMATCH');
       const result = priorResult(lock, evidence.operation_result);
@@ -418,6 +491,18 @@ function transition(lock, request, evidence, now) {
   }
 }
 
+export function requireCoordinator(actor, evidence) {
+  checkContract('run-holder', actor, 'LOCK_WRITER_UNAUTHORIZED');
+  requireThat(
+    evidence?.principal === 'rra-test-coordinator' &&
+      evidence.job === 'coordinator' &&
+      evidence.latest_attempt === actor.run_attempt &&
+      evidence.workflow_allowed === true &&
+      same(actor, evidence.actor),
+    'LOCK_WRITER_UNAUTHORIZED',
+  );
+}
+
 export function planLockTransition(observed, request, trustedEvidence, now) {
   checkContract('lock', observed, 'LOCK_INVALID');
   requireThat(
@@ -427,13 +512,7 @@ export function planLockTransition(observed, request, trustedEvidence, now) {
         (observed.recovery_from !== null),
     'LOCK_INVALID',
   );
-  requireThat(
-    trustedEvidence?.principal === 'rra-test-coordinator' &&
-      trustedEvidence.workflow_allowed === true &&
-      same(request.actor, trustedEvidence.actor),
-    'LOCK_WRITER_UNAUTHORIZED',
-  );
-  checkContract('run-holder', request.actor, 'LOCK_WRITER_UNAUTHORIZED');
+  requireCoordinator(request.actor, trustedEvidence);
   const replacement = checkContract(
     'lock',
     transition(observed, request, trustedEvidence, now),

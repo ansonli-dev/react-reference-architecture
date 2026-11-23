@@ -333,6 +333,35 @@ test('a cancellation request and uncertain operation preserve the candidate unti
   assert.equal(restored.generation, 9);
   assert.equal(restored.phase, 'prod_active');
   assert.equal(restored.results.at(-1).result.sha, sha('f'));
+  const release = candidate('promoted');
+  const resume = {
+    kind: 'record_intent',
+    actor: nextActor,
+    generation: 9,
+    candidate: release,
+    operation: {
+      ...operation,
+      id: 'prod-resume-deploy',
+      kind: 'deploy',
+      actor_job: 'prod-deployer',
+      sha: release.prod_merge_sha,
+      digest: release.manifest_digest,
+    },
+  };
+  assert.throws(
+    () =>
+      planLockTransition(
+        restored,
+        { ...resume, operation: { ...resume.operation, sha: sha('9') } },
+        control(nextActor),
+        now,
+      ),
+    { code: 'MERGE_RECEIPT_MISMATCH' },
+  );
+  assert.throws(
+    () => planLockTransition(restored, resume, control(nextActor), now),
+    { code: 'RECOVERY_APPROVAL_UNVERIFIED' },
+  );
   assert.throws(
     () =>
       planLockTransition(
@@ -352,7 +381,12 @@ test('a cancellation request and uncertain operation preserve the candidate unti
     () =>
       planLockTransition(
         restored,
-        { kind: 'record_intent', actor: nextActor, generation: 9, operation },
+        {
+          kind: 'record_intent',
+          actor: nextActor,
+          generation: 9,
+          operation: { ...operation, id: 'different-run-merge' },
+        },
         control(nextActor),
         now,
       ),

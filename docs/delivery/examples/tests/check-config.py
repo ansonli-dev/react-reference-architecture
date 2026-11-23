@@ -33,6 +33,9 @@ for name in schemas:
 
 assert not validate("candidate", fixture("invalid/candidate.json"))
 assert not validate("callback", fixture("invalid/callback.json"))
+callback = fixture("valid/callback.json")
+assert validate("callback", {**callback, "conclusion": "cancelled", "test_sha": None, "deployed_sha": None})
+assert not validate("callback", {**callback, "deployed_sha": None})
 assert not validate("qa-signoff", {**fixture("valid/qa-signoff.json"), "qa_passed": True})
 
 k8s = {path.stem: list(yaml.safe_load_all(path.read_text())) for path in (root / "k8s").glob("*.yaml")}

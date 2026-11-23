@@ -3,20 +3,27 @@
   "revision": 1,
   "test_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
   "test_tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "test_deployment": {
+    "run_id": 200,
+    "run_attempt": 1,
+    "evidence_id": "test-receipt"
+  },
   "manifest_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
   "items_hash": "sha256:8e7e0713ed05c5281ef5dc08981e3a8a9009a6d3ed8ea979c0a507c2a015510b",
   "test_config_refs": [
     {
       "kind": "ConfigMap",
       "name": "bookstore-runtime-v1",
-      "version": "v1"
+      "version": "v1",
+      "uid": "00000000-0000-4000-8000-00000000000a"
     }
   ],
   "prod_config_refs": [
     {
       "kind": "ConfigMap",
       "name": "bookstore-runtime-v1",
-      "version": "v1"
+      "version": "v1",
+      "uid": "00000000-0000-4000-8000-00000000000a"
     }
   ],
   "id": "qa-report-1",

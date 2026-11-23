@@ -1,12 +1,20 @@
 import {
   DeliveryError,
+  fingerprint,
+  requireCurrentQa,
   requireThat,
   same,
   validateCandidate,
   validateRefs,
 } from './contracts.mjs';
 import { checkExecution, planOperation, runOperation } from './guard.mjs';
-import { candidateSubject, requireIntent } from './lock.mjs';
+import {
+  candidateSubject,
+  requireCurrentGrant,
+  requireDeploymentMerge,
+  requireIntent,
+  requireRecoveryApproval,
+} from './lock.mjs';
 import { probeArguments, verifyDeployment } from './verify.mjs';
 
 const plans = new WeakMap();
@@ -163,6 +171,8 @@ async function verifyIntent(
     );
     return;
   }
+  // The executor identity is read independently of the coordinator's authorization.
+  const executor = await deps.readExecutor?.();
   const receipt = await deps.readIntent?.();
   const intent = receipt?.authorization?.operation;
   const subject = candidateSubject(candidate);
@@ -170,7 +180,6 @@ async function verifyIntent(
     intent?.kind === operation &&
       intent.target === environment &&
       intent.status === 'in_flight' &&
-      intent.actor_job === receipt.actor_job &&
       intent.sha === expected.sha &&
       intent.digest === expected.manifest_digest &&
       testNamespaceUid &&
@@ -181,6 +190,51 @@ async function verifyIntent(
     'LOCK_INTENT_MISMATCH',
   );
   requireIntent(receipt.lock, receipt.authorization);
+  const { holder, generation } = receipt.lock;
+  requireThat(
+    executor &&
+      [
+        'repository',
+        'workflow_id',
+        'workflow_sha',
+        'run_id',
+        'run_attempt',
+      ].every((key) => executor[key] === holder[key]) &&
+      executor.latest_attempt === holder.run_attempt &&
+      executor.job === intent.actor_job &&
+      executor.generation === generation &&
+      executor.operation_id === intent.id,
+    'EXECUTOR_NOT_AUTHORIZED',
+  );
+  if (operation === 'deploy')
+    requireDeploymentMerge(receipt.lock, intent, candidate);
+  const now = deps.now?.() ?? Date.now();
+  if (environment === 'prod' || receipt.lock.grant)
+    requireCurrentGrant(receipt.lock, receipt.current_grant, now);
+  requireRecoveryApproval(receipt.lock, intent, receipt.recovery_approval, now);
+  if (environment === 'prod' && operation === 'deploy') {
+    const qa = receipt.current_qa?.signoff;
+    requireCurrentQa(candidate, qa, receipt.current_qa, now);
+    if (receipt.lock.grant.kind === 'handoff')
+      requireThat(
+        fingerprint(qa) === receipt.current_grant.signoff_digest,
+        'QA_AUTHORITY_UNVERIFIED',
+      );
+  }
+}
+
+async function verifyConfigRefs(plan, refs, deps) {
+  const configs = await deps.readConfigs(plan, refs);
+  for (const ref of refs) {
+    const entry = configs?.find(
+      (value) => value.kind === ref.kind && value.name === ref.name,
+    );
+    requireThat(
+      entry?.version === ref.version && entry.immutable === true,
+      'CONFIG_VERSION_MISSING',
+    );
+    requireThat(entry.uid === ref.uid, 'CONFIG_IDENTITY_MISMATCH');
+  }
 }
 
 export async function runDeployment(preview, deps) {
@@ -196,24 +250,11 @@ export async function runDeployment(preview, deps) {
   );
   if (operation === 'rollback') {
     requireThat(
-      same(await deps.readPreviousGood(publicPlan), expected) &&
-        (await deps.readRollbackApproval?.(publicPlan, expected)) === true,
+      same(await deps.readPreviousGood(publicPlan), expected),
       'ROLLBACK_NOT_APPROVED',
     );
   }
-  const configs = await deps.readConfigs(publicPlan, expected.config_refs);
-  requireThat(
-    expected.config_refs.every((ref) =>
-      configs?.some(
-        (entry) =>
-          entry.kind === ref.kind &&
-          entry.name === ref.name &&
-          entry.version === ref.version &&
-          entry.immutable === true,
-      ),
-    ),
-    'CONFIG_VERSION_MISSING',
-  );
+  await verifyConfigRefs(publicPlan, expected.config_refs, deps);
   // Trust relationships are read before any mutation, and Pod imageID is checked after rollout.
   const descriptors = await deps.readDescriptors(expected);
   requireThat(
@@ -223,6 +264,12 @@ export async function runDeployment(preview, deps) {
       descriptors.config_digest === expected.config_digest,
     'OCI_DESCRIPTOR_MISMATCH',
   );
+  if (operation === 'rollback') {
+    requireThat(
+      (await deps.readRollbackApproval?.(publicPlan, expected)) === true,
+      'ROLLBACK_NOT_APPROVED',
+    );
+  }
   await verifyIntent(
     environment,
     operation,
@@ -246,6 +293,7 @@ export async function runDeployment(preview, deps) {
       'PREVIOUS_GOOD_CHANGED',
     );
     await deps.savePreviousGood(record);
+    await verifyConfigRefs(publicPlan, expected.config_refs, deps);
     await verifyIntent(
       environment,
       operation,
@@ -260,6 +308,7 @@ export async function runDeployment(preview, deps) {
   delete replacement.status;
   await deps.replaceDeployment(replacement, publicPlan.commands[2]);
   await deps.waitRollout(publicPlan.commands[3]);
+  await verifyConfigRefs(publicPlan, expected.config_refs, deps);
   const observed = await deps.readDeployment(publicPlan);
   const forward = await deps.portForward(probeArguments(publicPlan));
   try {

@@ -99,8 +99,15 @@
       ]
     },
     "deployed_sha": {
-      "type": "string",
-      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+        }
+      ]
     },
     "manifest_digest": {
       "type": "string",
@@ -117,7 +124,7 @@
       "enum": ["success", "failure", "cancelled", "timed_out"]
     },
     "expected_step": {
-      "enum": ["develop_deployment", "test_deployment", "prod_deployment"]
+      "enum": ["b_a_4_wait", "b_b_4_wait", "test_deployment", "prod_deployment"]
     },
     "step_round": {
       "type": "integer",
@@ -127,5 +134,27 @@
       "type": "string",
       "minLength": 1
     }
-  }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "conclusion": {
+          "const": "success"
+        },
+        "deployed_sha": {
+          "type": "string",
+          "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "conclusion": {
+          "enum": ["failure", "cancelled", "timed_out"]
+        }
+      }
+    }
+  ]
 }

@@ -3,7 +3,7 @@
   "$id": "https://rra.example/contracts/config-ref.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["kind", "name", "version"],
+  "required": ["kind", "name", "version", "uid"],
   "properties": {
     "kind": {
       "enum": ["ConfigMap", "Secret"]
@@ -15,6 +15,10 @@
     "version": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "uid": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
     }
   }
 }

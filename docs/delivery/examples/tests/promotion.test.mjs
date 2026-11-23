@@ -19,10 +19,10 @@ import {
   sha,
 } from './samples.mjs';
 
-function scenario(environment = 'prod') {
+function scenario(environment = 'prod', preset = {}) {
   const prod = environment === 'prod';
-  const value = candidate(prod ? 'qa_ready' : 'built');
-  const qa = prod ? signoff() : null;
+  const value = preset.value ?? candidate(prod ? 'qa_ready' : 'built');
+  const qa = prod ? signoff(value) : null;
   const { options, evidence } = controlledInput(environment);
   const gate = planOperation({
     ...options,
@@ -32,8 +32,10 @@ function scenario(environment = 'prod') {
     },
   });
   const coordinator = actor(prod ? 300 : 200);
-  let lock = prod ? snapshot() : available();
-  const handoffProof = prod ? handoff(lock).evidence : null;
+  let lock = prod ? snapshot(value) : available();
+  const handoffProof = prod
+    ? handoff(lock, 'handoff', coordinator, value, qa).evidence
+    : null;
   const source = prod ? value.test_sha : value.source_sha;
   const target = prod ? value.expected_prod_sha : value.expected_test_base_sha;
   const merge_sha = prod ? sha('f') : sha('e');
@@ -129,6 +131,63 @@ function scenario(environment = 'prod') {
 function plan(sample) {
   return validatePromotion(sample.value, sample.qa, sample.state, now);
 }
+
+test('an old QA approval cannot promote a redeployment of the same commit and image', () => {
+  for (const change of [{ run_attempt: 2 }, { evidence_id: 'new-receipt' }]) {
+    const sample = scenario();
+    const redeployed = {
+      ...sample.value,
+      test_deployment: { ...sample.value.test_deployment, ...change },
+    };
+    const state = {
+      ...sample.state,
+      test_evidence: redeployed.test_deployment,
+    };
+    assert.throws(() => validatePromotion(redeployed, sample.qa, state, now), {
+      code: 'SIGNOFF_VERSION_MISMATCH',
+    });
+    assert.deepEqual(sample.calls, []);
+  }
+});
+
+test('a freshly signed test receipt permits promotion of the redeployed artifact', async () => {
+  const value = candidate();
+  value.test_deployment = {
+    ...value.test_deployment,
+    run_attempt: 2,
+    evidence_id: 'test-receipt-2',
+  };
+  value.qa_signoff = { ...value.qa_signoff, version: 2 };
+  const sample = scenario('prod', { value });
+  const result = await executePromotion(plan(sample), sample.deps);
+  assert.equal(result.outcome, 'verified');
+  assert.deepEqual(
+    sample.calls
+      .filter(([kind]) => kind === 'merge' || kind === 'deploy')
+      .map(([kind]) => kind),
+    ['merge', 'deploy'],
+  );
+});
+
+test('revocation during deployment-intent CAS leaves the verified merge and makes zero deployments', async () => {
+  const sample = scenario();
+  const replace = sample.deps.replaceConfigMap;
+  sample.deps.replaceConfigMap = async (body) => {
+    const saved = await replace(body);
+    if (saved.operation?.kind === 'deploy')
+      sample.state.signoff = {
+        ...sample.state.signoff,
+        revoked_at: '2026-11-02T00:00:00Z',
+      };
+    return saved;
+  };
+  const result = await executePromotion(plan(sample), sample.deps);
+  assert.equal(result.merged, true);
+  assert.equal(result.deployed, false);
+  assert.equal(result.code, 'QA_AUTHORITY_UNVERIFIED');
+  assert.equal(sample.calls.filter(([kind]) => kind === 'merge').length, 1);
+  assert.equal(sample.calls.filter(([kind]) => kind === 'deploy').length, 0);
+});
 
 test('test reserves before merge and holds during QA; prod takes over then deploys the signed digest', async () => {
   for (const env of ['test', 'prod']) {

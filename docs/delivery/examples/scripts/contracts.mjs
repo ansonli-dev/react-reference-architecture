@@ -175,11 +175,13 @@ export function validateCandidate(value) {
 }
 
 export function signedVersions(candidate) {
+  const { run_id, run_attempt, evidence_id } = candidate.test_deployment;
   return {
     candidate_id: candidate.candidate_id,
     revision: candidate.revision,
     test_sha: candidate.test_sha,
     test_tree: candidate.test_tree,
+    test_deployment: { run_id, run_attempt, evidence_id },
     manifest_digest: candidate.manifest_digest,
     items_hash: itemsHash(candidate.items),
     test_config_refs: candidate.config_refs_by_environment.test,
@@ -217,6 +219,20 @@ export function validateSignoff(value, candidate, now) {
     );
   }
   return value;
+}
+
+export function requireCurrentQa(candidate, signoff, state, now) {
+  requireThat(
+    signoff &&
+      same(state?.signoff, signoff) &&
+      state.authorized_qa?.includes(signoff.principal),
+    'QA_AUTHORITY_UNVERIFIED',
+  );
+  validateSignoff(signoff, candidate, now);
+  requireThat(
+    same(state.test_evidence, candidate.test_deployment),
+    'TEST_DEPLOYMENT_MISMATCH',
+  );
 }
 
 export function validateBinding(value) {

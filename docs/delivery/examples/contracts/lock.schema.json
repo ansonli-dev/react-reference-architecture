@@ -350,7 +350,7 @@
         {
           "type": "object",
           "additionalProperties": false,
-          "required": ["id", "digest", "predecessor"],
+          "required": ["id", "kind", "digest", "predecessor"],
           "properties": {
             "id": {
               "type": "string",
@@ -362,6 +362,9 @@
             },
             "predecessor": {
               "$ref": "run-holder.schema.json"
+            },
+            "kind": {
+              "enum": ["handoff", "recover", "finalize"]
             }
           }
         }

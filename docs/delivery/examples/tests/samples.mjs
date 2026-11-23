@@ -6,7 +6,12 @@ export const digest = (hex) => 'sha256:' + hex.repeat(64);
 export const id = (digit) => '00000000-0000-4000-8000-00000000000' + digit;
 export const now = Date.parse('2026-11-02T00:00:00Z');
 export const config = [
-  { kind: 'ConfigMap', name: 'bookstore-runtime-v1', version: 'v1' },
+  {
+    kind: 'ConfigMap',
+    name: 'bookstore-runtime-v1',
+    version: 'v1',
+    uid: id('a'),
+  },
 ];
 
 export function candidate(stage = 'qa_ready') {
@@ -64,11 +69,10 @@ export function candidate(stage = 'qa_ready') {
   return structuredClone(value);
 }
 
-export function signoff() {
+export function signoff(value = candidate()) {
   return {
-    ...signedVersions(candidate()),
-    id: 'qa-report-1',
-    version: 1,
+    ...signedVersions(value),
+    ...value.qa_signoff,
     config_reviewed: true,
     report_id: 'qa-1',
     principal: 'fixture-qa',

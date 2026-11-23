@@ -12,6 +12,11 @@ import {
 
 const verified = new WeakMap();
 const workflows = { develop: 'develop', test: 'test', prod: 'promote-prod' };
+// Fixed owner lanes from the VENU-23 offline Workflow preview.
+const developSteps = {
+  dev_a: ['b_a_4_wait', 'b_a_4_smoke'],
+  dev_b: ['b_b_4_wait', 'b_b_4_smoke'],
+};
 
 export function githubAttemptPath(payload) {
   checkContract('callback', payload, 'CALLBACK_INVALID');
@@ -25,13 +30,45 @@ export function githubAttemptPath(payload) {
   );
 }
 
-function registrationFor(record) {
+function resolveRoute(record, candidate, owners) {
+  const env = record.environment;
+  let owner;
+  let wait;
+  let next;
+  if (env === 'develop') {
+    const item = candidate.items.find(
+      (value) => value.issue_id === record.issue_id,
+    );
+    owner = item?.implementation_owner;
+    requireThat(
+      owner && owners?.dev_a && owners.dev_b && owners.dev_a !== owners.dev_b,
+      'DEVELOP_OWNER_MAPPING_UNVERIFIED',
+    );
+    const lane = Object.keys(developSteps).find(
+      (role) => owners[role] === owner,
+    );
+    const steps = developSteps[lane];
+    requireThat(steps, 'CALLBACK_ISSUE_MISMATCH');
+    [wait, next] = steps;
+  } else {
+    requireThat(
+      record.issue_id === candidate.release_issue_id,
+      'CALLBACK_ISSUE_MISMATCH',
+    );
+    wait = env + '_deployment';
+    next = env === 'test' ? 'c3' : 'd3';
+  }
+  requireThat(record.expected_step === wait, 'CALLBACK_WORKFLOW_MISMATCH');
   return {
-    issue_id: record.issue_id,
-    step: record.expected_step,
-    round: record.step_round,
-    candidate_id: record.candidate_id,
-    revision: record.revision,
+    registration: {
+      issue_id: record.issue_id,
+      step: wait,
+      round: record.step_round,
+      candidate_id: record.candidate_id,
+      revision: record.revision,
+      ...(owner && { implementation_owner: owner }),
+    },
+    next_step: record.conclusion === 'success' ? next : 'infra_triage',
   };
 }
 
@@ -42,8 +79,7 @@ export function validateCallback(payload, trustedRun, candidate, currentStep) {
   const env = payload.environment;
   requireThat(
     payload.workflow_path === '.github/workflows/' + workflows[env] + '.yml' &&
-      payload.namespace === targets[env].namespace &&
-      payload.expected_step === env + '_deployment',
+      payload.namespace === targets[env].namespace,
     'CALLBACK_WORKFLOW_MISMATCH',
   );
   requireThat(trustedRun?.status === 'completed', 'RUN_NOT_TERMINAL');
@@ -56,32 +92,34 @@ export function validateCallback(payload, trustedRun, candidate, currentStep) {
   requireThat(
     payload.candidate_id === candidate.candidate_id &&
       payload.revision === candidate.revision &&
-      payload.issue_id === candidate.release_issue_id &&
       payload.source_sha === candidate.source_sha &&
-      payload.test_sha === (candidate.test_sha ?? null) &&
-      payload.prod_sha === (candidate.prod_merge_sha ?? null) &&
-      payload.deployed_sha ===
-        {
-          develop: candidate.source_sha,
-          test: candidate.test_sha,
-          prod: candidate.prod_merge_sha,
-        }[env] &&
+      (payload.test_sha === null || payload.test_sha === candidate.test_sha) &&
+      (payload.prod_sha === null ||
+        payload.prod_sha === candidate.prod_merge_sha) &&
+      (env !== 'prod' || payload.test_sha === candidate.test_sha) &&
       payload.manifest_digest === candidate.manifest_digest &&
       same(payload.config_refs, candidate.config_refs_by_environment[env]),
     'CALLBACK_VERSION_MISMATCH',
   );
-  if (payload.conclusion === 'success') {
+  if (env === 'develop') {
     requireThat(
-      trustedRun.deployment_verified === true,
+      payload.run_id === candidate.build_run_id &&
+        payload.run_attempt === candidate.build_run_attempt,
+      'DEVELOP_RUN_MISMATCH',
+    );
+  }
+  if (payload.conclusion === 'success' || payload.deployed_sha !== null) {
+    const intended = {
+      develop: candidate.source_sha,
+      test: payload.test_sha,
+      prod: payload.prod_sha,
+    }[env];
+    requireThat(
+      payload.deployed_sha &&
+        payload.deployed_sha === intended &&
+        trustedRun.deployment_verified === true,
       'DEPLOYMENT_NOT_VERIFIED',
     );
-    if (env === 'develop') {
-      requireThat(
-        payload.run_id === candidate.build_run_id &&
-          payload.run_attempt === candidate.build_run_attempt,
-        'DEVELOP_RUN_MISMATCH',
-      );
-    }
     if (env === 'test') {
       const tested = candidate.test_deployment;
       requireThat(
@@ -93,7 +131,7 @@ export function validateCallback(payload, trustedRun, candidate, currentStep) {
     }
   }
 
-  const registration = registrationFor(payload);
+  const route = resolveRoute(payload, candidate, trustedRun.develop_owners);
   if (
     currentStep?.candidate_id === payload.candidate_id &&
     currentStep.revision === payload.revision
@@ -105,6 +143,7 @@ export function validateCallback(payload, trustedRun, candidate, currentStep) {
   }
   const observation = {
     record: structuredClone(payload),
+    ...route,
     payload_digest: fingerprint(payload),
     event_key: fingerprint([
       payload.repository,
@@ -112,8 +151,9 @@ export function validateCallback(payload, trustedRun, candidate, currentStep) {
       payload.run_id,
       payload.run_attempt,
       payload.candidate_id,
+      payload.issue_id,
     ]),
-    transition_key: fingerprint(registration),
+    transition_key: fingerprint(route.registration),
   };
   verified.set(observation, structuredClone(observation));
   return observation;
@@ -141,7 +181,7 @@ export function decideTransition(observation, state) {
   if (!state.reg)
     return { ...result, action: 'wait', code: 'CANDIDATE_NOT_REGISTERED' };
   if (
-    !same(state.reg, registrationFor(record)) ||
+    !same(state.reg, observation.registration) ||
     record.run_id !== state.latest_run_id ||
     record.run_attempt < state.latest_attempt
   )
@@ -151,6 +191,7 @@ export function decideTransition(observation, state) {
   return {
     ...result,
     action: 'transition',
+    next_step: observation.next_step,
     expected: state.reg,
     expected_run_id: state.latest_run_id,
     expected_attempt: state.latest_attempt,

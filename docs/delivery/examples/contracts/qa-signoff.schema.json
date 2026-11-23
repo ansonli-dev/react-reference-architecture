@@ -10,6 +10,7 @@
     "revision",
     "test_sha",
     "test_tree",
+    "test_deployment",
     "manifest_digest",
     "items_hash",
     "test_config_refs",
@@ -106,6 +107,25 @@
     },
     "conclusion": {
       "const": "passed"
+    },
+    "test_deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run_id", "run_attempt", "evidence_id"],
+      "properties": {
+        "run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "run_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     }
   }
 }

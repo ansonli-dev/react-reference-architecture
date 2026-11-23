@@ -15,8 +15,8 @@
   "subject": {
     "candidate_id": "00000000-0000-4000-8000-000000000001",
     "revision": 1,
-    "built_digest": "sha256:4bc64df16d763e11935854eb34bf9da480f522f780dea853d42491e8f795e62a",
-    "test_digest": "sha256:c5401b4247ab4f04571906c4e562a50fadef4228a2dbd0f7413e62cdc02b1beb",
+    "built_digest": "sha256:c30a756dbc1d24c6eea1d219287ecd33621d7e347b3b7467ca3c6ac3284e08e3",
+    "test_digest": "sha256:7649e9a062794a6166b11a0ebc7846ec768164606f15ba57227b1c526df6f0ca",
     "test_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
     "bootstrap_id": null,
     "bootstrap_sha": null
@@ -35,7 +35,7 @@
         "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
         "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
         "digest": null,
-        "evidence_id": "test-receipt"
+        "evidence_id": "test-merge-receipt"
       }
     },
     {

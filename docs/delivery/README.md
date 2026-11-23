@@ -18,7 +18,7 @@ Spec/Plan `2026-11-02.2` 原件与 TL 结论保存在 VENU-24。Spec SHA256 为 
 
 ## 离线检查
 
-在仓库根目录使用 Node 24 和固定 pnpm 11.25.0。
+在仓库根目录使用 Node 24 和固定 pnpm 11.25.0。连续普通合并用例使用本地 Git 的 `merge-tree --write-tree`。
 
 ```bash
 pnpm install --frozen-lockfile

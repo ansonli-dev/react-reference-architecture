@@ -13,6 +13,8 @@ export const actor = (run_id) => ({
 export const control = (holder) => ({
   actor: holder,
   principal: holder.coordinator_principal,
+  job: 'coordinator',
+  latest_attempt: holder.run_attempt,
   workflow_allowed: true,
 });
 export function available() {
@@ -30,65 +32,96 @@ export function available() {
     recovery_from: null,
   };
 }
-export function acquire(value = candidate('built')) {
-  const holder = actor(200);
+export function acquire(value = candidate('built'), holder = actor(200)) {
   return {
     request: { kind: 'acquire', actor: holder, candidate: value },
     evidence: { ...control(holder), approved_candidate: fingerprint(value) },
   };
 }
-export function snapshot() {
-  const { request, evidence } = acquire();
-  let locked = planLockTransition(available(), request, evidence, now);
-  const merged = candidate('test_deployed');
-  for (const kind of ['merge', 'deploy']) {
-    const operation = {
-      id: 'test-' + kind,
-      kind,
-      target: 'test',
-      actor_job: kind === 'merge' ? 'coordinator' : 'test-deployer',
-      status: 'in_flight',
-      sha: kind === 'merge' ? merged.source_sha : merged.test_sha,
-      digest: kind === 'merge' ? null : merged.manifest_digest,
-      result: null,
-    };
-    locked = planLockTransition(
-      locked,
-      { kind: 'record_intent', actor: locked.holder, generation: 7, operation },
-      evidence,
-      now,
-    );
-    const receipt = {
-      ...operation,
-      status: 'succeeded',
-      result: {
-        sha: merged.test_sha,
-        tree: merged.test_tree,
-        digest: operation.digest,
-        evidence_id: 'test-receipt',
-      },
-    };
-    locked = planLockTransition(
-      locked,
-      { kind: 'complete_intent', actor: locked.holder, generation: 7 },
-      { ...evidence, operation_result: receipt },
-      now,
-    );
-  }
+function completeTestOperation(lock, value, kind) {
+  const operation = {
+    id: 'test-' + kind,
+    kind,
+    target: 'test',
+    actor_job: kind === 'merge' ? 'coordinator' : 'test-deployer',
+    status: 'in_flight',
+    sha: kind === 'merge' ? value.source_sha : value.test_sha,
+    digest: kind === 'merge' ? null : value.manifest_digest,
+    result: null,
+  };
+  const position = { actor: lock.holder, generation: lock.generation };
+  const evidence = control(lock.holder);
+  const pending = planLockTransition(
+    lock,
+    { ...position, kind: 'record_intent', operation, candidate: value },
+    evidence,
+    now,
+  );
+  const receipt = {
+    ...operation,
+    status: 'succeeded',
+    result: {
+      sha: value.test_sha,
+      tree: value.test_tree,
+      digest: operation.digest,
+      evidence_id:
+        kind === 'merge'
+          ? 'test-merge-receipt'
+          : value.test_deployment.evidence_id,
+    },
+  };
+  return planLockTransition(
+    pending,
+    { ...position, kind: 'complete_intent' },
+    { ...evidence, operation_result: receipt },
+    now,
+  );
+}
+
+export function testMergedLock(value, holder = actor(200)) {
+  const built = {
+    ...Object.fromEntries(
+      Object.keys(candidate('built')).map((key) => [key, value[key]]),
+    ),
+    stage: 'built',
+  };
+  const { request, evidence } = acquire(built, holder);
+  return completeTestOperation(
+    planLockTransition(available(), request, evidence, now),
+    value,
+    'merge',
+  );
+}
+
+export function snapshot(value = candidate('test_deployed')) {
+  const holder = {
+    ...actor(value.test_deployment.run_id),
+    run_attempt: value.test_deployment.run_attempt,
+  };
+  const locked = completeTestOperation(
+    testMergedLock(value, holder),
+    value,
+    'deploy',
+  );
   return planLockTransition(
     locked,
     {
       kind: 'finish_test',
       actor: locked.holder,
       generation: 7,
-      candidate: merged,
+      candidate: value,
     },
-    evidence,
+    control(holder),
     now,
   );
 }
-export function handoff(locked, kind = 'handoff', successor = actor(300)) {
-  const qa = signoff();
+export function handoff(
+  locked,
+  kind = 'handoff',
+  successor = actor(300),
+  value = candidate(),
+  qa = signoff(value),
+) {
   const grant = {
     id: 'grant-1',
     version: 1,
@@ -108,7 +141,7 @@ export function handoff(locked, kind = 'handoff', successor = actor(300)) {
     request: {
       kind,
       actor: successor,
-      candidate: candidate(),
+      candidate: value,
       grant_id: grant.id,
     },
     evidence: {
@@ -116,7 +149,7 @@ export function handoff(locked, kind = 'handoff', successor = actor(300)) {
       predecessor: {
         holder: locked.holder,
         terminal: true,
-        latest_attempt: 1,
+        latest_attempt: locked.holder.run_attempt,
         writes_quiescent: true,
         conclusion: 'success',
       },
