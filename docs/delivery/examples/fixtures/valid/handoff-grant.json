@@ -1,0 +1,29 @@
+{
+  "id": "grant-1",
+  "version": 1,
+  "kind": "handoff",
+  "lock_uid": "00000000-0000-4000-8000-000000000005",
+  "namespace_uid": "00000000-0000-4000-8000-000000000008",
+  "expected_generation": 7,
+  "subject_digest": "sha256:7f5e41f6861e8fe036a4b0ad5bf0dd65f55d612ae525d9bb2e67b896d6463eed",
+  "predecessor": {
+    "repository": "ansonli-dev/react-reference-architecture",
+    "workflow_id": 42,
+    "workflow_sha": "7777777777777777777777777777777777777777",
+    "run_id": 200,
+    "run_attempt": 1,
+    "coordinator_principal": "rra-test-coordinator"
+  },
+  "successor": {
+    "repository": "ansonli-dev/react-reference-architecture",
+    "workflow_id": 42,
+    "workflow_sha": "7777777777777777777777777777777777777777",
+    "run_id": 300,
+    "run_attempt": 1,
+    "coordinator_principal": "rra-test-coordinator"
+  },
+  "signoff_digest": "sha256:64d90de76e8d0d51d94acae903857efb8e917f8adb336796907e00582a26ed3c",
+  "created_at": "2026-11-01T00:00:00Z",
+  "expires_at": "2026-11-03T00:00:00Z",
+  "revoked_at": null
+}

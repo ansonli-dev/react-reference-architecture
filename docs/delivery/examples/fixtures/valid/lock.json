@@ -1,0 +1,59 @@
+{
+  "uid": "00000000-0000-4000-8000-000000000005",
+  "namespace_uid": "00000000-0000-4000-8000-000000000008",
+  "resource_version": "opaque-v1",
+  "phase": "qa_window",
+  "generation": 7,
+  "holder": {
+    "repository": "ansonli-dev/react-reference-architecture",
+    "workflow_id": 42,
+    "workflow_sha": "7777777777777777777777777777777777777777",
+    "run_id": 200,
+    "run_attempt": 1,
+    "coordinator_principal": "rra-test-coordinator"
+  },
+  "subject": {
+    "candidate_id": "00000000-0000-4000-8000-000000000001",
+    "revision": 1,
+    "built_digest": "sha256:4bc64df16d763e11935854eb34bf9da480f522f780dea853d42491e8f795e62a",
+    "test_digest": "sha256:c5401b4247ab4f04571906c4e562a50fadef4228a2dbd0f7413e62cdc02b1beb",
+    "test_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+    "bootstrap_id": null,
+    "bootstrap_sha": null
+  },
+  "operation": null,
+  "results": [
+    {
+      "id": "test-merge",
+      "kind": "merge",
+      "target": "test",
+      "actor_job": "coordinator",
+      "status": "succeeded",
+      "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "digest": null,
+      "result": {
+        "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "digest": null,
+        "evidence_id": "test-receipt"
+      }
+    },
+    {
+      "id": "test-deploy",
+      "kind": "deploy",
+      "target": "test",
+      "actor_job": "test-deployer",
+      "status": "succeeded",
+      "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+      "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+      "result": {
+        "sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        "tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "evidence_id": "test-receipt"
+      }
+    }
+  ],
+  "grant": null,
+  "recovery_from": null
+}

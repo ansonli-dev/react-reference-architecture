@@ -1,0 +1,603 @@
+# Review-only preview. Provision only after activation review.
+apiVersion: 'v1'
+kind: 'Namespace'
+metadata:
+  name: 'rra-develop'
+---
+apiVersion: 'v1'
+kind: 'ResourceQuota'
+metadata:
+  name: 'bookstore'
+  namespace: 'rra-develop'
+spec:
+  hard:
+    requests.cpu: '2'
+    requests.memory: '2Gi'
+    limits.cpu: '2'
+    limits.memory: '2Gi'
+    pods: '10'
+---
+apiVersion: 'v1'
+kind: 'LimitRange'
+metadata:
+  name: 'bookstore'
+  namespace: 'rra-develop'
+spec:
+  limits:
+    - type: 'Container'
+      max:
+        cpu: '1'
+        memory: '1Gi'
+      defaultRequest:
+        cpu: '100m'
+        memory: '128Mi'
+      default:
+        cpu: '500m'
+        memory: '512Mi'
+---
+apiVersion: 'v1'
+kind: 'ServiceAccount'
+metadata:
+  name: 'bookstore'
+  namespace: 'rra-develop'
+automountServiceAccountToken: false
+---
+apiVersion: 'v1'
+kind: 'ServiceAccount'
+metadata:
+  name: 'rra-develop-deployer'
+  namespace: 'rra-develop'
+automountServiceAccountToken: false
+---
+apiVersion: 'v1'
+kind: 'ConfigMap'
+metadata:
+  name: 'bookstore-deployment-record'
+  namespace: 'rra-develop'
+data:
+  state: 'null'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'Role'
+metadata:
+  name: 'rra-develop-deployer'
+  namespace: 'rra-develop'
+rules:
+  - apiGroups:
+      - 'apps'
+    resources:
+      - 'deployments'
+    resourceNames:
+      - 'bookstore'
+    verbs:
+      - 'get'
+      - 'watch'
+      - 'update'
+      - 'patch'
+  - apiGroups:
+      - 'apps'
+    resources:
+      - 'replicasets'
+    verbs:
+      - 'get'
+      - 'list'
+      - 'watch'
+  - apiGroups:
+      - ''
+    resources:
+      - 'pods'
+      - 'events'
+    verbs:
+      - 'get'
+      - 'list'
+      - 'watch'
+  - apiGroups:
+      - ''
+    resources:
+      - 'pods/portforward'
+    verbs:
+      - 'create'
+  - apiGroups:
+      - ''
+    resources:
+      - 'services'
+    resourceNames:
+      - 'bookstore'
+    verbs:
+      - 'get'
+  - apiGroups:
+      - ''
+    resources:
+      - 'configmaps'
+    resourceNames:
+      - 'bookstore-runtime-v1'
+    verbs:
+      - 'get'
+  - apiGroups:
+      - ''
+    resources:
+      - 'configmaps'
+    resourceNames:
+      - 'bookstore-deployment-record'
+    verbs:
+      - 'get'
+      - 'update'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'RoleBinding'
+metadata:
+  name: 'rra-develop-deployer'
+  namespace: 'rra-develop'
+roleRef:
+  apiGroup: 'rbac.authorization.k8s.io'
+  kind: 'Role'
+  name: 'rra-develop-deployer'
+subjects:
+  - kind: 'ServiceAccount'
+    name: 'rra-develop-deployer'
+    namespace: 'rra-develop'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'ClusterRole'
+metadata:
+  name: 'rra-develop-deployer-namespace'
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - 'namespaces'
+    resourceNames:
+      - 'rra-develop'
+    verbs:
+      - 'get'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'ClusterRoleBinding'
+metadata:
+  name: 'rra-develop-deployer-namespace'
+roleRef:
+  apiGroup: 'rbac.authorization.k8s.io'
+  kind: 'ClusterRole'
+  name: 'rra-develop-deployer-namespace'
+subjects:
+  - kind: 'ServiceAccount'
+    name: 'rra-develop-deployer'
+    namespace: 'rra-develop'
+---
+apiVersion: 'v1'
+kind: 'Namespace'
+metadata:
+  name: 'rra-test'
+---
+apiVersion: 'v1'
+kind: 'ResourceQuota'
+metadata:
+  name: 'bookstore'
+  namespace: 'rra-test'
+spec:
+  hard:
+    requests.cpu: '2'
+    requests.memory: '2Gi'
+    limits.cpu: '2'
+    limits.memory: '2Gi'
+    pods: '10'
+---
+apiVersion: 'v1'
+kind: 'LimitRange'
+metadata:
+  name: 'bookstore'
+  namespace: 'rra-test'
+spec:
+  limits:
+    - type: 'Container'
+      max:
+        cpu: '1'
+        memory: '1Gi'
+      defaultRequest:
+        cpu: '100m'
+        memory: '128Mi'
+      default:
+        cpu: '500m'
+        memory: '512Mi'
+---
+apiVersion: 'v1'
+kind: 'ServiceAccount'
+metadata:
+  name: 'bookstore'
+  namespace: 'rra-test'
+automountServiceAccountToken: false
+---
+apiVersion: 'v1'
+kind: 'ServiceAccount'
+metadata:
+  name: 'rra-test-deployer'
+  namespace: 'rra-test'
+automountServiceAccountToken: false
+---
+apiVersion: 'v1'
+kind: 'ConfigMap'
+metadata:
+  name: 'bookstore-deployment-record'
+  namespace: 'rra-test'
+data:
+  state: 'null'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'Role'
+metadata:
+  name: 'rra-test-deployer'
+  namespace: 'rra-test'
+rules:
+  - apiGroups:
+      - 'apps'
+    resources:
+      - 'deployments'
+    resourceNames:
+      - 'bookstore'
+    verbs:
+      - 'get'
+      - 'watch'
+      - 'update'
+      - 'patch'
+  - apiGroups:
+      - 'apps'
+    resources:
+      - 'replicasets'
+    verbs:
+      - 'get'
+      - 'list'
+      - 'watch'
+  - apiGroups:
+      - ''
+    resources:
+      - 'pods'
+      - 'events'
+    verbs:
+      - 'get'
+      - 'list'
+      - 'watch'
+  - apiGroups:
+      - ''
+    resources:
+      - 'pods/portforward'
+    verbs:
+      - 'create'
+  - apiGroups:
+      - ''
+    resources:
+      - 'services'
+    resourceNames:
+      - 'bookstore'
+    verbs:
+      - 'get'
+  - apiGroups:
+      - ''
+    resources:
+      - 'configmaps'
+    resourceNames:
+      - 'bookstore-runtime-v1'
+    verbs:
+      - 'get'
+  - apiGroups:
+      - ''
+    resources:
+      - 'configmaps'
+    resourceNames:
+      - 'bookstore-deployment-record'
+    verbs:
+      - 'get'
+      - 'update'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'RoleBinding'
+metadata:
+  name: 'rra-test-deployer'
+  namespace: 'rra-test'
+roleRef:
+  apiGroup: 'rbac.authorization.k8s.io'
+  kind: 'Role'
+  name: 'rra-test-deployer'
+subjects:
+  - kind: 'ServiceAccount'
+    name: 'rra-test-deployer'
+    namespace: 'rra-test'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'ClusterRole'
+metadata:
+  name: 'rra-test-deployer-namespace'
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - 'namespaces'
+    resourceNames:
+      - 'rra-test'
+    verbs:
+      - 'get'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'ClusterRoleBinding'
+metadata:
+  name: 'rra-test-deployer-namespace'
+roleRef:
+  apiGroup: 'rbac.authorization.k8s.io'
+  kind: 'ClusterRole'
+  name: 'rra-test-deployer-namespace'
+subjects:
+  - kind: 'ServiceAccount'
+    name: 'rra-test-deployer'
+    namespace: 'rra-test'
+---
+apiVersion: 'v1'
+kind: 'Namespace'
+metadata:
+  name: 'rra-prod'
+---
+apiVersion: 'v1'
+kind: 'ResourceQuota'
+metadata:
+  name: 'bookstore'
+  namespace: 'rra-prod'
+spec:
+  hard:
+    requests.cpu: '2'
+    requests.memory: '2Gi'
+    limits.cpu: '2'
+    limits.memory: '2Gi'
+    pods: '10'
+---
+apiVersion: 'v1'
+kind: 'LimitRange'
+metadata:
+  name: 'bookstore'
+  namespace: 'rra-prod'
+spec:
+  limits:
+    - type: 'Container'
+      max:
+        cpu: '1'
+        memory: '1Gi'
+      defaultRequest:
+        cpu: '100m'
+        memory: '128Mi'
+      default:
+        cpu: '500m'
+        memory: '512Mi'
+---
+apiVersion: 'v1'
+kind: 'ServiceAccount'
+metadata:
+  name: 'bookstore'
+  namespace: 'rra-prod'
+automountServiceAccountToken: false
+---
+apiVersion: 'v1'
+kind: 'ServiceAccount'
+metadata:
+  name: 'rra-prod-deployer'
+  namespace: 'rra-prod'
+automountServiceAccountToken: false
+---
+apiVersion: 'v1'
+kind: 'ConfigMap'
+metadata:
+  name: 'bookstore-deployment-record'
+  namespace: 'rra-prod'
+data:
+  state: 'null'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'Role'
+metadata:
+  name: 'rra-prod-deployer'
+  namespace: 'rra-prod'
+rules:
+  - apiGroups:
+      - 'apps'
+    resources:
+      - 'deployments'
+    resourceNames:
+      - 'bookstore'
+    verbs:
+      - 'get'
+      - 'watch'
+      - 'update'
+      - 'patch'
+  - apiGroups:
+      - 'apps'
+    resources:
+      - 'replicasets'
+    verbs:
+      - 'get'
+      - 'list'
+      - 'watch'
+  - apiGroups:
+      - ''
+    resources:
+      - 'pods'
+      - 'events'
+    verbs:
+      - 'get'
+      - 'list'
+      - 'watch'
+  - apiGroups:
+      - ''
+    resources:
+      - 'pods/portforward'
+    verbs:
+      - 'create'
+  - apiGroups:
+      - ''
+    resources:
+      - 'services'
+    resourceNames:
+      - 'bookstore'
+    verbs:
+      - 'get'
+  - apiGroups:
+      - ''
+    resources:
+      - 'configmaps'
+    resourceNames:
+      - 'bookstore-runtime-v1'
+    verbs:
+      - 'get'
+  - apiGroups:
+      - ''
+    resources:
+      - 'configmaps'
+    resourceNames:
+      - 'bookstore-deployment-record'
+    verbs:
+      - 'get'
+      - 'update'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'RoleBinding'
+metadata:
+  name: 'rra-prod-deployer'
+  namespace: 'rra-prod'
+roleRef:
+  apiGroup: 'rbac.authorization.k8s.io'
+  kind: 'Role'
+  name: 'rra-prod-deployer'
+subjects:
+  - kind: 'ServiceAccount'
+    name: 'rra-prod-deployer'
+    namespace: 'rra-prod'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'ClusterRole'
+metadata:
+  name: 'rra-prod-deployer-namespace'
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - 'namespaces'
+    resourceNames:
+      - 'rra-prod'
+    verbs:
+      - 'get'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'ClusterRoleBinding'
+metadata:
+  name: 'rra-prod-deployer-namespace'
+roleRef:
+  apiGroup: 'rbac.authorization.k8s.io'
+  kind: 'ClusterRole'
+  name: 'rra-prod-deployer-namespace'
+subjects:
+  - kind: 'ServiceAccount'
+    name: 'rra-prod-deployer'
+    namespace: 'rra-prod'
+---
+apiVersion: 'v1'
+kind: 'ServiceAccount'
+metadata:
+  name: 'rra-test-coordinator'
+  namespace: 'rra-test'
+automountServiceAccountToken: false
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'Role'
+metadata:
+  name: 'rra-test-coordinator'
+  namespace: 'rra-test'
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - 'configmaps'
+    resourceNames:
+      - 'bookstore-delivery-state'
+    verbs:
+      - 'get'
+      - 'update'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'RoleBinding'
+metadata:
+  name: 'rra-test-coordinator'
+  namespace: 'rra-test'
+roleRef:
+  apiGroup: 'rbac.authorization.k8s.io'
+  kind: 'Role'
+  name: 'rra-test-coordinator'
+subjects:
+  - kind: 'ServiceAccount'
+    name: 'rra-test-coordinator'
+    namespace: 'rra-test'
+---
+apiVersion: 'v1'
+kind: 'ServiceAccount'
+metadata:
+  name: 'rra-test-lock-reader'
+  namespace: 'rra-test'
+automountServiceAccountToken: false
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'Role'
+metadata:
+  name: 'rra-test-lock-reader'
+  namespace: 'rra-test'
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - 'configmaps'
+    resourceNames:
+      - 'bookstore-delivery-state'
+    verbs:
+      - 'get'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'RoleBinding'
+metadata:
+  name: 'rra-test-lock-reader'
+  namespace: 'rra-test'
+roleRef:
+  apiGroup: 'rbac.authorization.k8s.io'
+  kind: 'Role'
+  name: 'rra-test-lock-reader'
+subjects:
+  - kind: 'ServiceAccount'
+    name: 'rra-test-lock-reader'
+    namespace: 'rra-test'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'ClusterRole'
+metadata:
+  name: 'rra-test-coordinator-namespace'
+rules:
+  - apiGroups:
+      - ''
+    resources:
+      - 'namespaces'
+    resourceNames:
+      - 'rra-test'
+    verbs:
+      - 'get'
+---
+apiVersion: 'rbac.authorization.k8s.io/v1'
+kind: 'ClusterRoleBinding'
+metadata:
+  name: 'rra-test-coordinator-namespace'
+roleRef:
+  apiGroup: 'rbac.authorization.k8s.io'
+  kind: 'ClusterRole'
+  name: 'rra-test-coordinator-namespace'
+subjects:
+  - kind: 'ServiceAccount'
+    name: 'rra-test-coordinator'
+    namespace: 'rra-test'
+---
+apiVersion: 'v1'
+kind: 'ConfigMap'
+metadata:
+  name: 'bookstore-delivery-state'
+  namespace: 'rra-test'
+data:
+  state: '{"phase":"available","generation":0,"holder":null,"subject":null,"operation":null,"results":[],"grant":null,"recovery_from":null}'
