@@ -1,0 +1,49 @@
+name: Test candidate preview
+on:
+  workflow_dispatch:
+    inputs:
+      release_issue_id:
+        description: Multica release issue for the exact candidate
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: bookstore-control
+  cancel-in-progress: false
+jobs:
+  reserve-and-merge:
+    if: ${{ false }}
+    runs-on: [self-hosted, macOS, ARM64, rra-local]
+    environment: test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Plan approval and lock acquisition before normal develop to test merge
+        run: node docs/delivery/examples/scripts/guard.mjs docs/delivery/examples/fixtures/valid/activation-blocked.json --environment test --mode plan
+  deploy-test:
+    if: ${{ false }}
+    runs-on: [self-hosted, macOS, ARM64, rra-local]
+    environment: test
+    needs: reserve-and-merge
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Plan read-only lock verification and deployment of the test manifest digest
+        run: node docs/delivery/examples/scripts/guard.mjs docs/delivery/examples/fixtures/valid/activation-blocked.json --environment test --mode plan
+  retain-for-qa:
+    if: ${{ false }}
+    runs-on: [self-hosted, macOS, ARM64, rra-local]
+    environment: test
+    needs: [reserve-and-merge, deploy-test]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Plan terminal receipts while retaining the candidate through QA
+        run: node docs/delivery/examples/scripts/guard.mjs docs/delivery/examples/fixtures/valid/activation-blocked.json --environment test --mode plan
