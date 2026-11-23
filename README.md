@@ -50,3 +50,5 @@ flowchart TB
 ## 文档
 
 [文档索引](docs/README.md) · [运行与发布](docs/operations/run-and-release.md) · [测试入口](docs/testing-strategy/README.md#运行入口)
+
+[本地 K8s 交付准备](docs/delivery/README.md)提供未激活的三段 CI/CD 样例、验证命令及恢复手册，待独立审查。

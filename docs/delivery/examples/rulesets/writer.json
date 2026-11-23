@@ -1,0 +1,17 @@
+{
+  "name": "bookstore promotion writer preview",
+  "target": "branch",
+  "enforcement": "disabled",
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/test", "refs/heads/prod"],
+      "exclude": []
+    }
+  },
+  "bypass_actors": [],
+  "rules": [
+    {
+      "type": "update"
+    }
+  ]
+}

@@ -1,0 +1,85 @@
+{
+  "schema_version": 1,
+  "stage": "qa_ready",
+  "candidate_id": "00000000-0000-4000-8000-000000000001",
+  "revision": 1,
+  "repository": "ansonli-dev/react-reference-architecture",
+  "release_issue_id": "00000000-0000-4000-8000-000000000002",
+  "source_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "source_tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "expected_test_base_sha": "cccccccccccccccccccccccccccccccccccccccc",
+  "expected_prod_sha": "dddddddddddddddddddddddddddddddddddddddd",
+  "manifest_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "config_digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+  "platform": "linux/arm64",
+  "config_refs_by_environment": {
+    "develop": [
+      {
+        "kind": "ConfigMap",
+        "name": "bookstore-runtime-v1",
+        "version": "v1",
+        "uid": "00000000-0000-4000-8000-00000000000a"
+      }
+    ],
+    "test": [
+      {
+        "kind": "ConfigMap",
+        "name": "bookstore-runtime-v1",
+        "version": "v1",
+        "uid": "00000000-0000-4000-8000-00000000000a"
+      }
+    ],
+    "prod": [
+      {
+        "kind": "ConfigMap",
+        "name": "bookstore-runtime-v1",
+        "version": "v1",
+        "uid": "00000000-0000-4000-8000-00000000000a"
+      }
+    ]
+  },
+  "items": [
+    {
+      "issue_id": "00000000-0000-4000-8000-000000000003",
+      "key": "VENU-24",
+      "implementation_owner": "00000000-0000-4000-8000-000000000004",
+      "completion_target": "independent_review",
+      "spec_plan_version": "2026-11-02.2",
+      "scope": "synthetic catalog deployment"
+    }
+  ],
+  "build_run_id": 100,
+  "build_run_attempt": 1,
+  "previous_good_by_environment": {
+    "develop": null,
+    "test": null,
+    "prod": null
+  },
+  "test_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "test_tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "test_merge": {
+    "parents": [
+      "cccccccccccccccccccccccccccccccccccccccc",
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ],
+    "artifact_tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  },
+  "test_deployment": {
+    "run_id": 200,
+    "run_attempt": 1,
+    "observed_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+    "config_refs": [
+      {
+        "kind": "ConfigMap",
+        "name": "bookstore-runtime-v1",
+        "version": "v1",
+        "uid": "00000000-0000-4000-8000-00000000000a"
+      }
+    ],
+    "evidence_id": "test-receipt"
+  },
+  "qa_signoff": {
+    "id": "qa-report-1",
+    "version": 1
+  }
+}

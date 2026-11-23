@@ -1,0 +1,39 @@
+{
+  "candidate_id": "00000000-0000-4000-8000-000000000001",
+  "revision": 1,
+  "test_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+  "test_tree": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+  "test_deployment": {
+    "run_id": 200,
+    "run_attempt": 1,
+    "evidence_id": "test-receipt"
+  },
+  "manifest_digest": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "items_hash": "sha256:8e7e0713ed05c5281ef5dc08981e3a8a9009a6d3ed8ea979c0a507c2a015510b",
+  "test_config_refs": [
+    {
+      "kind": "ConfigMap",
+      "name": "bookstore-runtime-v1",
+      "version": "v1",
+      "uid": "00000000-0000-4000-8000-00000000000a"
+    }
+  ],
+  "prod_config_refs": [
+    {
+      "kind": "ConfigMap",
+      "name": "bookstore-runtime-v1",
+      "version": "v1",
+      "uid": "00000000-0000-4000-8000-00000000000a"
+    }
+  ],
+  "id": "qa-report-1",
+  "version": 1,
+  "config_reviewed": true,
+  "report_id": "qa-1",
+  "principal": "fixture-qa",
+  "round": 1,
+  "created_at": "2026-11-01T00:00:00Z",
+  "expires_at": "2026-11-03T00:00:00Z",
+  "revoked_at": null,
+  "conclusion": "passed"
+}

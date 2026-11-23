@@ -1,0 +1,22 @@
+# Workflow review copy. Preserve disabled jobs until provider admission is reviewed.
+name: Develop deployment preview
+on:
+  push:
+    branches: [develop]
+permissions:
+  contents: read
+jobs:
+  build-deploy:
+    if: ${{ false }}
+    runs-on: [self-hosted, macOS, ARM64, rra-local]
+    environment: develop
+    concurrency:
+      group: bookstore-develop
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Plan release build pinned to the push SHA and namespace verification
+        run: node docs/delivery/examples/scripts/guard.mjs docs/delivery/examples/fixtures/valid/activation-blocked.json --environment develop --mode plan

@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rra.example/contracts/callback.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "repository",
+    "workflow_id",
+    "workflow_path",
+    "workflow_sha",
+    "run_id",
+    "run_attempt",
+    "environment",
+    "namespace",
+    "candidate_id",
+    "revision",
+    "issue_id",
+    "source_sha",
+    "test_sha",
+    "prod_sha",
+    "deployed_sha",
+    "manifest_digest",
+    "config_refs",
+    "conclusion",
+    "expected_step",
+    "step_round",
+    "evidence_id"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "repository": {
+      "const": "ansonli-dev/react-reference-architecture"
+    },
+    "workflow_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "workflow_path": {
+      "type": "string",
+      "pattern": "^\\.github/workflows/(develop|test|promote-prod)\\.yml$"
+    },
+    "workflow_sha": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+    },
+    "run_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "run_attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "environment": {
+      "enum": ["develop", "test", "prod"]
+    },
+    "namespace": {
+      "enum": ["rra-develop", "rra-test", "rra-prod"]
+    },
+    "candidate_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "issue_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "source_sha": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+    },
+    "test_sha": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+        }
+      ]
+    },
+    "prod_sha": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+        }
+      ]
+    },
+    "deployed_sha": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+        }
+      ]
+    },
+    "manifest_digest": {
+      "type": "string",
+      "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+    },
+    "config_refs": {
+      "type": "array",
+      "items": {
+        "$ref": "config-ref.schema.json"
+      },
+      "minItems": 0
+    },
+    "conclusion": {
+      "enum": ["success", "failure", "cancelled", "timed_out"]
+    },
+    "expected_step": {
+      "enum": ["b_a_4_wait", "b_b_4_wait", "test_deployment", "prod_deployment"]
+    },
+    "step_round": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "evidence_id": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "conclusion": {
+          "const": "success"
+        },
+        "deployed_sha": {
+          "type": "string",
+          "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+        }
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "conclusion": {
+          "enum": ["failure", "cancelled", "timed_out"]
+        }
+      }
+    }
+  ]
+}

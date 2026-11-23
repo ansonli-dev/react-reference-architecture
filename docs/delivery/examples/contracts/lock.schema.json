@@ -1,0 +1,385 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rra.example/contracts/lock.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "uid",
+    "namespace_uid",
+    "resource_version",
+    "phase",
+    "generation",
+    "holder",
+    "subject",
+    "operation",
+    "results",
+    "grant",
+    "recovery_from"
+  ],
+  "properties": {
+    "uid": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "namespace_uid": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "resource_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "phase": {
+      "enum": [
+        "available",
+        "test_active",
+        "qa_window",
+        "prod_active",
+        "prod_qa_window",
+        "finalizing",
+        "recovery_required",
+        "bootstrap_active"
+      ]
+    },
+    "generation": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "holder": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "run-holder.schema.json"
+        }
+      ]
+    },
+    "subject": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "candidate_id",
+            "revision",
+            "built_digest",
+            "test_digest",
+            "test_sha",
+            "bootstrap_id",
+            "bootstrap_sha"
+          ],
+          "properties": {
+            "candidate_id": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+                }
+              ]
+            },
+            "revision": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              ]
+            },
+            "built_digest": {
+              "type": "string",
+              "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+            },
+            "test_digest": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+                }
+              ]
+            },
+            "test_sha": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+                }
+              ]
+            },
+            "bootstrap_id": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "minLength": 1
+                }
+              ]
+            },
+            "bootstrap_sha": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "operation": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "target",
+            "actor_job",
+            "status",
+            "sha",
+            "digest",
+            "result"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "kind": {
+              "enum": ["merge", "deploy", "rollback", "bootstrap_ref"]
+            },
+            "target": {
+              "enum": ["test", "prod"]
+            },
+            "actor_job": {
+              "type": "string",
+              "minLength": 1
+            },
+            "status": {
+              "enum": ["in_flight", "succeeded", "failed", "not_applied"]
+            },
+            "sha": {
+              "type": "string",
+              "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+            },
+            "digest": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+                }
+              ]
+            },
+            "result": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["sha", "tree", "digest", "evidence_id"],
+                  "properties": {
+                    "sha": {
+                      "type": "string",
+                      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+                    },
+                    "tree": {
+                      "anyOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+                        }
+                      ]
+                    },
+                    "digest": {
+                      "anyOf": [
+                        {
+                          "type": "null"
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+                        }
+                      ]
+                    },
+                    "evidence_id": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "kind",
+          "target",
+          "actor_job",
+          "status",
+          "sha",
+          "digest",
+          "result"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "kind": {
+            "enum": ["merge", "deploy", "rollback", "bootstrap_ref"]
+          },
+          "target": {
+            "enum": ["test", "prod"]
+          },
+          "actor_job": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "enum": ["in_flight", "succeeded", "failed", "not_applied"]
+          },
+          "sha": {
+            "type": "string",
+            "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+          },
+          "digest": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "string",
+                "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+              }
+            ]
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["sha", "tree", "digest", "evidence_id"],
+                "properties": {
+                  "sha": {
+                    "type": "string",
+                    "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+                  },
+                  "tree": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+                      }
+                    ]
+                  },
+                  "digest": {
+                    "anyOf": [
+                      {
+                        "type": "null"
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+                      }
+                    ]
+                  },
+                  "evidence_id": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "minItems": 0
+    },
+    "grant": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "kind", "digest", "predecessor"],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "digest": {
+              "type": "string",
+              "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+            },
+            "predecessor": {
+              "$ref": "run-holder.schema.json"
+            },
+            "kind": {
+              "enum": ["handoff", "recover", "finalize"]
+            }
+          }
+        }
+      ]
+    },
+    "recovery_from": {
+      "enum": [
+        null,
+        "bootstrap_active",
+        "test_active",
+        "qa_window",
+        "prod_active",
+        "prod_qa_window",
+        "finalizing"
+      ]
+    }
+  }
+}

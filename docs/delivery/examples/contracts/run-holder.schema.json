@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rra.example/contracts/run-holder.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "repository",
+    "workflow_id",
+    "workflow_sha",
+    "run_id",
+    "run_attempt",
+    "coordinator_principal"
+  ],
+  "properties": {
+    "repository": {
+      "const": "ansonli-dev/react-reference-architecture"
+    },
+    "workflow_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "workflow_sha": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+    },
+    "run_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "run_attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "coordinator_principal": {
+      "const": "rra-test-coordinator"
+    }
+  }
+}

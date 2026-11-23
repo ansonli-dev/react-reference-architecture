@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rra.example/contracts/activation-binding.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "repository",
+    "context",
+    "authorization_id",
+    "api_server",
+    "cluster_uid",
+    "namespaces",
+    "registry",
+    "runner_admission"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "repository": {
+      "const": "ansonli-dev/react-reference-architecture"
+    },
+    "context": {
+      "const": "docker-desktop"
+    },
+    "authorization_id": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1
+        }
+      ]
+    },
+    "api_server": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^https://127\\.0\\.0\\.1:[0-9]+$"
+        }
+      ]
+    },
+    "cluster_uid": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+        }
+      ]
+    },
+    "namespaces": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["develop", "test", "prod"],
+      "properties": {
+        "develop": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "uid"],
+          "properties": {
+            "name": {
+              "const": "rra-develop"
+            },
+            "uid": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+                }
+              ]
+            }
+          }
+        },
+        "test": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "uid"],
+          "properties": {
+            "name": {
+              "const": "rra-test"
+            },
+            "uid": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+                }
+              ]
+            }
+          }
+        },
+        "prod": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["name", "uid"],
+          "properties": {
+            "name": {
+              "const": "rra-prod"
+            },
+            "uid": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "registry": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "ca_digest", "evidence_id"],
+          "properties": {
+            "repository": {
+              "type": "string",
+              "pattern": "^[a-z0-9.-]+(?::[0-9]{1,5})?/[a-z0-9/_.-]+$"
+            },
+            "ca_digest": {
+              "type": "string",
+              "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+            },
+            "evidence_id": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
+    "runner_admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "policy_id", "verified_at", "expires_at"],
+      "properties": {
+        "status": {
+          "enum": ["blocked", "verified"]
+        },
+        "policy_id": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "minLength": 1
+            }
+          ]
+        },
+        "verified_at": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$"
+            }
+          ]
+        },
+        "expires_at": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "string",
+              "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{3})?Z$"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

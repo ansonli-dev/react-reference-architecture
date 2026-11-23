@@ -1,0 +1,509 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rra.example/contracts/candidate.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "stage",
+    "candidate_id",
+    "revision",
+    "repository",
+    "release_issue_id",
+    "source_sha",
+    "source_tree",
+    "expected_test_base_sha",
+    "expected_prod_sha",
+    "manifest_digest",
+    "config_digest",
+    "platform",
+    "config_refs_by_environment",
+    "items",
+    "build_run_id",
+    "build_run_attempt",
+    "previous_good_by_environment"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "stage": {
+      "enum": ["built", "test_merged", "test_deployed", "qa_ready", "promoted"]
+    },
+    "candidate_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "repository": {
+      "const": "ansonli-dev/react-reference-architecture"
+    },
+    "release_issue_id": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+    },
+    "source_sha": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+    },
+    "source_tree": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+    },
+    "expected_test_base_sha": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+    },
+    "expected_prod_sha": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+    },
+    "manifest_digest": {
+      "type": "string",
+      "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+    },
+    "config_digest": {
+      "type": "string",
+      "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+    },
+    "platform": {
+      "const": "linux/arm64"
+    },
+    "config_refs_by_environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["develop", "test", "prod"],
+      "properties": {
+        "develop": {
+          "type": "array",
+          "items": {
+            "$ref": "config-ref.schema.json"
+          },
+          "minItems": 0
+        },
+        "test": {
+          "type": "array",
+          "items": {
+            "$ref": "config-ref.schema.json"
+          },
+          "minItems": 0
+        },
+        "prod": {
+          "type": "array",
+          "items": {
+            "$ref": "config-ref.schema.json"
+          },
+          "minItems": 0
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "issue_id",
+          "key",
+          "implementation_owner",
+          "completion_target",
+          "spec_plan_version",
+          "scope"
+        ],
+        "properties": {
+          "issue_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+          },
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9]*-[1-9][0-9]*$"
+          },
+          "implementation_owner": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$"
+          },
+          "completion_target": {
+            "enum": [
+              "independent_review",
+              "merge_verified",
+              "test_verified",
+              "prod_business_accepted"
+            ]
+          },
+          "spec_plan_version": {
+            "type": "string",
+            "minLength": 1
+          },
+          "scope": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "minItems": 1
+    },
+    "build_run_id": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "build_run_attempt": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "previous_good_by_environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["develop", "test", "prod"],
+      "properties": {
+        "develop": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["record_id", "deployed_sha", "manifest_digest"],
+              "properties": {
+                "record_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "deployed_sha": {
+                  "type": "string",
+                  "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+                },
+                "manifest_digest": {
+                  "type": "string",
+                  "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+                }
+              }
+            }
+          ]
+        },
+        "test": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["record_id", "deployed_sha", "manifest_digest"],
+              "properties": {
+                "record_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "deployed_sha": {
+                  "type": "string",
+                  "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+                },
+                "manifest_digest": {
+                  "type": "string",
+                  "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+                }
+              }
+            }
+          ]
+        },
+        "prod": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["record_id", "deployed_sha", "manifest_digest"],
+              "properties": {
+                "record_id": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "deployed_sha": {
+                  "type": "string",
+                  "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+                },
+                "manifest_digest": {
+                  "type": "string",
+                  "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "test_sha": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+    },
+    "test_tree": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+    },
+    "test_merge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parents", "artifact_tree"],
+      "properties": {
+        "parents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "artifact_tree": {
+          "type": "string",
+          "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+        }
+      }
+    },
+    "test_deployment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "run_id",
+        "run_attempt",
+        "observed_digest",
+        "config_refs",
+        "evidence_id"
+      ],
+      "properties": {
+        "run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "run_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "observed_digest": {
+          "type": "string",
+          "pattern": "^(?!sha256:0{64}$)sha256:[a-f0-9]{64}$"
+        },
+        "config_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "config-ref.schema.json"
+          },
+          "minItems": 0
+        },
+        "evidence_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "qa_signoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "prod_merge_sha": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+    },
+    "prod_merge_tree": {
+      "type": "string",
+      "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+    },
+    "prod_merge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["parents"],
+      "properties": {
+        "parents": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^(?!0{40}$)[a-f0-9]{40}$"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "const": "built"
+        }
+      },
+      "not": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["test_sha"]
+          },
+          {
+            "type": "object",
+            "required": ["test_tree"]
+          },
+          {
+            "type": "object",
+            "required": ["test_merge"]
+          },
+          {
+            "type": "object",
+            "required": ["test_deployment"]
+          },
+          {
+            "type": "object",
+            "required": ["qa_signoff"]
+          },
+          {
+            "type": "object",
+            "required": ["prod_merge_sha"]
+          },
+          {
+            "type": "object",
+            "required": ["prod_merge_tree"]
+          },
+          {
+            "type": "object",
+            "required": ["prod_merge"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "const": "test_merged"
+        }
+      },
+      "required": ["test_merge", "test_sha", "test_tree"],
+      "not": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["test_deployment"]
+          },
+          {
+            "type": "object",
+            "required": ["qa_signoff"]
+          },
+          {
+            "type": "object",
+            "required": ["prod_merge_sha"]
+          },
+          {
+            "type": "object",
+            "required": ["prod_merge_tree"]
+          },
+          {
+            "type": "object",
+            "required": ["prod_merge"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "const": "test_deployed"
+        }
+      },
+      "required": ["test_deployment", "test_merge", "test_sha", "test_tree"],
+      "not": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["qa_signoff"]
+          },
+          {
+            "type": "object",
+            "required": ["prod_merge_sha"]
+          },
+          {
+            "type": "object",
+            "required": ["prod_merge_tree"]
+          },
+          {
+            "type": "object",
+            "required": ["prod_merge"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "const": "qa_ready"
+        }
+      },
+      "required": [
+        "qa_signoff",
+        "test_deployment",
+        "test_merge",
+        "test_sha",
+        "test_tree"
+      ],
+      "not": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["prod_merge_sha"]
+          },
+          {
+            "type": "object",
+            "required": ["prod_merge_tree"]
+          },
+          {
+            "type": "object",
+            "required": ["prod_merge"]
+          }
+        ]
+      }
+    },
+    {
+      "type": "object",
+      "properties": {
+        "stage": {
+          "enum": [
+            "built",
+            "test_merged",
+            "test_deployed",
+            "qa_ready",
+            "promoted"
+          ]
+        }
+      },
+      "required": [
+        "prod_merge",
+        "prod_merge_sha",
+        "prod_merge_tree",
+        "qa_signoff",
+        "test_deployment",
+        "test_merge",
+        "test_sha",
+        "test_tree"
+      ]
+    }
+  ]
+}

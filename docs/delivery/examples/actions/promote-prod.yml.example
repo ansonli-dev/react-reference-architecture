@@ -1,0 +1,60 @@
+name: Local prod promotion preview
+on:
+  workflow_dispatch:
+    inputs:
+      release_issue_id:
+        description: Multica release issue for the exact candidate
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: bookstore-control
+  cancel-in-progress: false
+jobs:
+  handoff-and-merge:
+    if: ${{ false }}
+    runs-on: [self-hosted, macOS, ARM64, rra-local]
+    environment: test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Plan QA directed grant and one CAS before the normal test to prod merge
+        run: node docs/delivery/examples/scripts/guard.mjs docs/delivery/examples/fixtures/valid/activation-blocked.json --environment test --mode plan
+  deploy-prod:
+    if: ${{ false }}
+    runs-on: [self-hosted, macOS, ARM64, rra-local]
+    environment: prod
+    needs: handoff-and-merge
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Plan deployment of the tested digest using prod writer and test lock reader
+        run: node docs/delivery/examples/scripts/guard.mjs docs/delivery/examples/fixtures/valid/activation-blocked.json --environment prod --mode plan
+  retain-for-prod-qa:
+    if: ${{ false }}
+    runs-on: [self-hosted, macOS, ARM64, rra-local]
+    environment: test
+    needs: [handoff-and-merge, deploy-prod]
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Plan terminal receipts while retaining the lock for final QA
+        run: node docs/delivery/examples/scripts/guard.mjs docs/delivery/examples/fixtures/valid/activation-blocked.json --environment test --mode plan
+  finalize-with-new-grant:
+    if: ${{ false }}
+    runs-on: [self-hosted, macOS, ARM64, rra-local]
+    environment: test
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Separate finalization request with a directed QA grant and durable archive
+        run: node docs/delivery/examples/scripts/guard.mjs docs/delivery/examples/fixtures/valid/activation-blocked.json --environment test --mode plan
